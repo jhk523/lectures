@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<head>
+  <meta charset = "utf-8">
+  <title>Event</title>
+  <script src="https://d3js.org/d3.v5.js"></script>
+</head>
+<body>
+  <svg height="500">
+    <rect transform="translate(100, 100)" width="50" height="50"></rect>
+    <rect transform="translate(150, 150)" width="50" height="50"></rect>
+  </svg>
+  <script>
+      d3.selectAll('rect')
+        .on('mouseenter.e1', function(){
+            d3.select(this)
+                .style('fill', 'red');
+        })
+        .on('mouseenter.e2', function(){
+            d3.select(this)
+                .transition()
+                .duration(500)
+                .attr('width', 100)
+                .attr('height', 100)
+        })
+        .on('mouseleave.e1', function(){
+            d3.select(this)
+                .style('fill', 'black');
+        })
+        .on('mouseleave.e2', function(){
+            d3.select(this)
+                .transition()
+                .duration(500)
+                .attr('width', 50)
+                .attr('height', 50);
+        });
+
+  </script>
+</body>

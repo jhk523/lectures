@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script src="https://d3js.org/d3.v5.js"></script>
+</head>
+<body>
+    <h1>Assignment 1</h1>
+
+    <h2>Scatterplot</h2>
+    <button type='button' id='plot-button'">Update</button>
+    <div id="plot"></div>
+
+    <h2>Histogram</h2>
+    <button type='button' id='bar-button'">Update</button>
+    <div id="bar"></div>
+
+    <script>
+        function translate(x, y){
+            return 'translate(' + x + ', ' + y + ')';
+        }
+        function getRandomInt(min, max){
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        function getRGB(r, g, b){
+            return 'rgb('+ r + ', ' + g + ', ' + b + ')';
+        }
+        function createPlotData(){
+            tempData = []
+
+            for(let i=0; i<100;i++){
+                tempData.push({
+                    cx: getRandomInt(0, 100),
+                    cy: getRandomInt(0, 100),
+                    r: getRandomInt(1, 5),
+                    rgb: {r: getRandomInt(0, 256),
+                        g: getRandomInt(0, 256),
+                        b: getRandomInt(0, 256)}
+            })};
+            return tempData;
+        }
+
+        function createPlot(){
+            let xAxis = d3.axisBottom(x);
+            let yAxis = d3.axisLeft(y);
+
+            let svg = d3.select('#plot')
+                        .append('svg')
+                        .attr('width', svgWidth)
+                        .attr('height', svgHeight)
+                        .append('g')
+                            .attr('transform', translate(margin.left, margin.top))
+
+            svg.selectAll('circle')
+                .data(data)
+                .enter()
+                .append('circle')
+                .attr('r', d => d.r)
+                .attr('cx', d => x(d.cx))
+                .attr('cy', d => y(d.cy))
+                .style('fill', d => getRGB(d.rgb.r, d.rgb.g, d.rgb.b));
+
+            svg.append('g')
+                .attr('transform', translate(0, height))
+                .call(xAxis);
+        
+            svg.append('g')
+                .attr('transform', translate(0, 0))
+                .call(yAxis);
+        }
+
+        function updatePlot(){
+            let data = createPlotData();
+
+            let circle = d3.selectAll('circle')
+                            .data(data)
+                            .transition()
+                            .duration(500)
+                            .attr('cx', d => x(d.cx))
+                            .attr('cy', d => y(d.cy))
+                            .attr('r', d => d.r)
+                            .style('fill', d => getRGB(d.rgb.r, d.rgb.g, d.rgb.b));
+        }
+
+        let svgHeight = 400;
+        let svgWidth = 400;
+        let margin = {top: 20, right: 10, bottom: 30, left: 40};
+        let width = svgWidth - margin.left - margin.right;
+        let height = svgHeight - margin.top - margin.bottom;
+
+        let data = createPlotData();
+
+        let x = d3.scaleLinear()
+                    .domain([
+                        d3.min(data, d => 0),
+                        d3.max(data, d => 100)
+                    ])
+                    .range([0, width]);
+        let y = d3.scaleLinear()
+                    .domain([
+                        d3.min(data, d => 0),
+                        d3.max(data, d => 100)
+                    ])
+                    .range([height, 0]);
+
+        let button = d3.select('#plot-button')
+                        .on("click", updatePlot);
+    
+        
+        createPlot();
+
+        d3.selectAll('circle')
+            .data(data)
+            .on('mouseover', function(){
+                d3.select(this)
+                    .transition()
+                    .duration(500)
+                    .attr('r', 15);
+            })
+            .on('mouseout', function(){
+                d3.select(this)
+                    .transition()
+                    .duration(500)
+                    .attr('r', d => d.r);
+            });
+    </script>
+
+    <script>
+        function createBarData(){
+            let tempData = [];
+            letters.forEach(element => {
+                tempData.push({
+                    name: element,
+                    value: getRandomInt(0, 100)
+                });
+            });
+
+            return tempData;
+        }
+        function createBar(){
+            let svg = d3.select('#bar')
+                        .append('svg')
+                        .attr('width', svgWidth)
+                        .attr('height', svgHeight)
+                        .append('g')
+                            .attr('transform', translate(margin.left, margin.top))
+
+            let x = d3.scaleBand()
+                        .domain(letters)
+                        .rangeRound([0, width])
+                        .padding(0.1);
+            let colour = d3.scaleOrdinal(d3.schemeCategory10)
+            let y = d3.scaleLinear()
+                        .domain([
+                            d3.min(barData, d => 0),
+                            d3.max(barData, d => 100)
+                        ])
+                        .range([height, 0]);
+
+            let xAxis = d3.axisBottom(x);
+            let yAxis = d3.axisLeft(y);
+            console.log(barData)
+
+            let bars = svg.selectAll('rect')
+                            .data(barData, d => d.name);
+            bars.enter()
+                .append('rect')
+                .merge(bars)
+                .attr('x', d => x(d.name))
+                .attr('y', d => y(d.value))
+                .attr('width', x.bandwidth())
+                .attr('height', d => height - y(d.value))
+                .style('fill', d => colour(d.name));
+
+
+            svg.append('g')
+            .attr('transform', translate(0, height))
+            .call(xAxis);
+        
+            svg.append('g')
+                .attr('transform', translate(0, 0))
+                .call(yAxis);
+            
+            bars.exit().remove();
+        }
+
+        function updateBar(){
+            let barData = []
+            barData = createBarData();
+            let circle = d3.selectAll('rect')
+                            .data(barData)
+                            .transition()
+                            .duration(500)
+                            .attr('y', d => y(d.value))
+                            .attr('height', d => height - y(d.value))
+        }
+
+        let letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+        let barData = createBarData();
+        createBar();
+
+        let barButton = d3.select('#bar-button')
+                        .on("click", updateBar);
+
+
+    </script>
+    
+</body>
+</html>
