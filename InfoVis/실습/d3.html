@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script src="https://d3js.org/d3.v5.js"></script>
+    <script src="data-movie.js.js"></script>
+</head>
+<body>
+    <svg height="1000" width="1000"></svg>
+
+    <!-- <script>
+        my_func = (a, b) => {return a + b;}
+
+        console.log(my_func(1, 3));
+        
+        let newData = [
+            {name: 'B', value: 10},
+            {name: 'C', value: 15},
+            {name: 'D', value: 5},
+        ];
+
+        let svg = d3.select('svg');
+        let bars = svg.selectAll('rect')
+                        .data(newData, d => d.name);
+
+        bars.enter()
+            .append('rect')
+            .merge(bars)
+            .attr('width', 30)
+            .attr('height', d => d.value * 10)
+            .attr('transform', (d, i) => 'translate(' + i * 40 + ", 0)")
+        
+        bars.exit().remove();
+    </script> -->
+
+    <script>
+        data.forEach(function(d){
+            d.us_gross = parseFloat(d.us_gross);
+            d.rotten_rating = parseFloat(d.rotten_rating);
+        })
+
+        let svg = d3.select('svg');
+        let width = 500;
+        let height = 500;
+
+        let x = d3.scaleLinear()
+                        .domain([
+                            d3.min(data, d => d.rotten_rating),
+                            d3.max(data, d => d.rotten_rating)
+                        ])
+                        .range([0, width]);
+        let y = d3.scaleLinear()
+            .domain([
+                d3.min(data, d => d.us_gross),
+                d3.max(data, d => d.us_gross)
+            ])
+            .range([height, 0]);
+
+        svg.selectAll('circle')
+            .data(data)
+            .enter()
+            .append('circle')
+            .attr('r', 3.5)
+            .attr('cx', d => x(d.rotten_rating))
+            .attr('cy', d => y(d.us_gross));
+    </script>
+    
+</body>
+</html>
