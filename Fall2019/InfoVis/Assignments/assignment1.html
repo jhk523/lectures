@@ -183,6 +183,9 @@
                     ])
                     .range([height, 0]);
         let barColour = d3.scaleOrdinal(d3.schemeCategory10)  
+        
+        createPlot(plotData, plotX, plotY, svgWidth, svgHeight, height);
+        createBar(barData, barX, barY, svgWidth, svgHeight, height);
 
         d3.selectAll('circle')
             .data(plotData)
@@ -198,9 +201,6 @@
                     .duration(500)
                     .attr('r', d => d.r);
             });
-        
-        createPlot(plotData, plotX, plotY, svgWidth, svgHeight, height);
-        createBar(barData, barX, barY, svgWidth, svgHeight, height);
 
         let button = d3.select('#button')
                         .on("click", updateAll);
