@@ -6,76 +6,75 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Assignment 2</title>
     <script src="https://d3js.org/d3.v5.js"></script>
+    <style>
+        select{display: block;}
+    </style>
 </head>
 <body>
-    <div id="plot"></div>
+    <div id="plot">
+        <select class="years"></select>
+        <select class="win_diff">
+            <option id="WR">WR</option>
+            <option id="DG">DG</option>
+        </select>
+        <select class="WDL">
+            <option id="W">W</option>
+            <option id="D">D</option>
+            <option id="L">L</option>
+        </select>
+    </div>
 
     <script>
+    function translate(plotX, plotY){
+        return 'translate(' + plotX + ', ' + plotY + ')';
+    }
+    
+    svgWidth = 450;
+    svgHeight = 450;
+    marginTop = 40;
+    marginLeft = 20;
+
     d3.json('data.json').then(function(data){
         data.forEach(function(d){
             d.rankings.forEach(function(d2){
                 d2.rank = parseFloat(d2.rank);
-                d2.games = parseInt(d2.games);
-                d2.W = parseInt(d2.W);
-                d2.L = parseInt(d2.L);
-                d2.D = parseInt(d2.D);
+                d2.games = parseFloat(d2.games);
+                d2.W = parseFloat(d2.W);
+                d2.L = parseFloat(d2.L);
+                d2.D = parseFloat(d2.D);
+                d2.diff_game = parseFloat(d2.diff_game);
                 d2.win_rate = parseFloat(d2.win_rate);
             })
         })
 
-        let year_selection = d3.select('#plot')
-                                .append('select')
-                                .attr('class', 'years')
+
+        let year_selection = d3.select('.years')
                                 .selectAll('option')
                                     .data(data)
                                     .join('option')
-                                    .text(k => k.year);
-                                    
-
-
-
-
-        let test = data[0];
-        let test_year = test.year;
-        let test_rankings = Object.keys(test.rankings[0]);
-
-        console.log(test);
-        console.log(test_year);
-        console.log(test_rankings);
+                                    .text(k => k.year)
+                                    .attr('id', k=> k.year)
 
         let table = d3.select('#plot')
                         .append('svg')
-                        .append('table')
                         .attr('id', 'table')
-                            .append('tr')
-                            .select('td')
-                                .data(test_rankings)
-                                    .join('td')
-                                    .text(k => k);
+                        .attr('width', svgWidth)
+                        .attr('height', svgHeight)
+            
+        d3.select('.years')
+            .on("change", function(d){
+                let selected = d3.select('.years').node().value;
+                console.log(selected);
+            })
         
-        // let mydata = [{a:1, b:2, c:3}, {a:4, b:5, c:6}];
-        // let keys = Object.keys(mydata[0]);
+        // let table_title = table.append('g')
+        //                 .attr('id', 'title')
+        //                 .attr('transform', translate(marginLeft, marginTop))
+        //                 .data(test_rankings)
+        //                 .append('text')
+        //                     .text(x => x)
 
-        // let table = d3.select('body').append('tables').attr('id', 'table');
-        // let thead = table.append('thead')
-        //                     .append('tr')
-        //                     .selectAll('td')
-        //                         .data(keys)
-        //                             .join('td')
-        //                             .text(k => k);
         
-        // let tbody = table.append('tbody');
-        // let trs = tbody.selectAll('tr')
-        //                 .data(mydata)
-        //                 .join('tr');
-        
-        // // trs.selectAll('td')
-        // //     .data(k => Object.entries(k))
-        // //     .join('td').text(d => d[1]);
-
-        // trs.selectAll('td')
-        //     .data(k => keys.map(eachKey => [eachKey, k[eachKey]]), tuple => tuple[0])
-        //     .join('td').text(d => d[1]);        
     })
 
     </script>
