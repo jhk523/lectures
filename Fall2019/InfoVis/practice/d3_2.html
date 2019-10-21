@@ -6,27 +6,118 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Document</title>
     <script src="https://d3js.org/d3.v5.js"></script>
+    <script src="data-movie.js.js"></script>
+    <style>
+        .selected{fill: green;}
+    </style>
 </head>
 <body>
-    <script>
-        let mydata = [{a:1, b:2, c:3},
-                      {a:4, b:5, c:6}];
-        let keys = Object.keys(mydata[0]);
+    <div id="plot"></div>
 
-        let table = d3.select('body')
-                        .append('table')
-                        .attr('id', 'table');
-        let thead = table.append('thead')
-                            .append('tr')
-                            .selectAll('td')
-                            .data(keys)
-                            .join('td')
-                            .text(k => k);
+    <script>
+        function translate(x, y){
+            return 'translate(' + x + ', ' + y + ')';
+        }
+
+        data.forEach(function(d){
+            d.us_gross = parseFloat(d.us_gross);
+            d.rotten_rating = parseFloat(d.rotten_rating);
+        })
+
+        let svgHeight = 550;
+        let svgWidth = 550;
+        let margin = {top: 20, right: 10, bottom: 30, left: 40};
+        let width = svgWidth - margin.left - margin.right;
+        let height = svgHeight - margin.top - margin.bottom;
+
+        let svg = d3.select('#plot')
+                    .append('svg')
+                        .attr('width', svgWidth )
+                        .attr('height', svgHeight)
+                        .append('g')
+                            .attr('transform', translate(margin.left, margin.top))
+
+
+        let x = d3.scaleLinear()
+                        .domain([
+                            d3.min(data, d => d.rotten_rating),
+                            d3.max(data, d => d.rotten_rating)
+                        ])
+                        .range([50, width]);
+        let y = d3.scaleLinear()
+            .domain([
+                d3.min(data, d => d.us_gross),
+                d3.max(data, d => d.us_gross)
+            ])
+            .range([height, 0]);
+
+        let xAxis = d3.axisBottom(x);
+        let yAxis = d3.axisLeft(y);
+
+        let color = d3.scaleOrdinal()
+                        .domain(['전체관람가', '7세이상', '15세이상', '19세이상'])
+                        .range(['#3366cc', '#109618', '#ff9900', '#dc3912']);
+
+        svg.selectAll('circle')
+            .data(data)
+            .enter()
+            .append('circle')
+            .attr('r', 3.5)
+            .attr('cx', d => x(d.rotten_rating))
+            .attr('cy', d => y(d.us_gross))
+
+        svg.append('g')
+            .attr('transform', translate(0, height))
+            .call(xAxis);
         
-        let tbody = table.append('tbody');
-        let trs = tbody.selectAll('tr')
-                        .data(mydata)
-                        .join('tr');
+        svg.append('g')
+            .attr('transform', translate(50, 0))
+            .call(yAxis);
+
+        let brush = d3.brush()
+                        .extent([[0, 0], [width, height]])
+                        .on('brush', brushing);
+
+        svg.append('g').call(brush);
+
+        function brushing(){
+            svg.selectAll('circle')
+                .classed('selected', function(k){
+                    let xCoord = x(k.rotten_rating)
+                    let yCoord = y(k.us_gross)
+                    let extent = d3.event.selection
+                    let x0 = extent[0][0]
+                    let y0 = extent[0][1]
+                    let x1 = extent[1][0]
+                    let y1 = extent[1][1]
+                    return xCoord > x0 && xCoord < x1 && yCoord >y0 && yCoord < y1
+                });
+        }
+    </script>
+    <script>
+        // let mydata = [{a:1, b:2, c:3}, {a:4, b:5, c:6}];
+        // let keys = Object.keys(mydata[0]);
+
+        // let table = d3.select('body').append('tables').attr('id', 'table');
+        // let thead = table.append('thead')
+        //                     .append('tr')
+        //                     .selectAll('td')
+        //                         .data(keys)
+        //                             .join('td')
+        //                             .text(k => k);
+        
+        // let tbody = table.append('tbody');
+        // let trs = tbody.selectAll('tr')
+        //                 .data(mydata)
+        //                 .join('tr');
+        
+        // // trs.selectAll('td')
+        // //     .data(k => Object.entries(k))
+        // //     .join('td').text(d => d[1]);
+
+        // trs.selectAll('td')
+        //     .data(k => keys.map(eachKey => [eachKey, k[eachKey]]), tuple => tuple[0])
+        //     .join('td').text(d => d[1]);
     </script>
 </body>
 </html>
