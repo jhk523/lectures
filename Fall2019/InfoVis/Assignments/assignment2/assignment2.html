@@ -59,7 +59,7 @@
         }
         let tableContents = d3.select('#table')
                             .append('g')
-                            .attr('transform', translate(marginLeft, marginTop))
+                            .attr('transform', translate(margin.left, margin.top))
                             .attr('class', 'content-group')
                             .selectAll('g')
                             .data(currentData.rankings)
@@ -111,14 +111,19 @@
         }
     }
 
-    svgWidth = 450;
-    svgHeight = 450;
-    marginTop = 40;
-    marginLeft = 20;
-    tableRectWidth = 60;
-    tableRectHeight = 30;
+    let svgWidth = 450;
+    let svgHeight = 400;
+    let tableRectWidth = 60;
+    let tableRectHeight = 30;
+    let margin = {top: 40, right: 10, bottom: 30, left: 20};
+    let width = svgWidth - margin.left - margin.right;
+    let height = svgHeight - margin.top - margin.bottom;
 
     d3.json('data.json').then(function(data){
+        let uniqueTeam = [];
+        let colorTeam = [];
+        let years = []
+
         data.forEach(function(d){
             d.rankings.forEach(function(d2){
                 d2.rank = parseFloat(d2.rank);
@@ -128,8 +133,14 @@
                 d2.D = parseFloat(d2.D);
                 d2.diff_game = parseFloat(d2.diff_game);
                 d2.win_rate = parseFloat(d2.win_rate);
+                uniqueTeam.push(d2.team);
             })
+            d.year = parseFloat(d.year)
+            years.push(d.year)
         })
+
+        uniqueTeam = [... new Set(uniqueTeam)];
+        for(let i=0; i<uniqueTeam.length; i++){colorTeam.push('#'+Math.floor(Math.random()*16777215).toString(16)) }
 
         let year_selection = d3.select('.years')
                                 .selectAll('option')
@@ -138,7 +149,7 @@
                                     .text(k => k.year)
                                     .attr('id', k=> k.year)
 
-        let currentData = getSelectedData(data, '1982');
+        let currentData = getSelectedData(data, 1982);
 
         let table = d3.select('#plot')
                         .append('svg')
@@ -153,7 +164,7 @@
                         .enter()
                         .append('g')
                         .attr('class', 'title')
-                        .attr('transform', translate(marginLeft, marginTop))
+                        .attr('transform', translate(margin.left, margin.top))
 
         let tableTitleRect = appendRect(tableTitle, 0)
 
@@ -163,15 +174,60 @@
                                 return translate(tableRectWidth * i, tableRectHeight)      
                             })
 
+        // line chart
+        let chartData = [];
+        for(let i=0; i<uniqueTeam.length;i++){
+            let temp = {'team': uniqueTeam[i], 'value': []};
+            chartData.push(temp);
+        }
+
+        for(let i=0; i<data.length;i++){
+            for(let j=0; j<data[i].rankings.length;j++){
+                for(let k=0; k<chartData.length; k++){
+                    if (chartData[k].team === data[i].rankings[j].team){
+                        let tempDict = {'year': data[i].year, 
+                                        'win_rate': data[i].rankings[j].win_rate}
+                        chartData[k].value.push(tempDict)
+                    }
+                }
+            }
+        }
+
+        let lineChart = d3.select('#plot')
+                            .append('svg')
+                            .attr('id', 'chart')
+                            .attr('width', svgWidth)
+                            .attr('height', svgHeight)
+
+        var chartX = d3.scaleLinear()
+                    .domain([
+                        d3.min(years),
+                        d3.max(years)
+                    ])
+                    .range([0, width])
+        var chartY = d3.scaleLinear()
+                    .domain([
+                        d3.min(years),
+                        d3.max(years)
+                    ])
+
+                 
+
+        // histogram
+
+
+        // run
         updateTable(currentData, true);
 
         d3.select('.years')
             .on("change", function(d){
-                let selected = d3.select('.years').node().value;
+                let selected = parseFloat(d3.select('.years').node().value);
                 currentData = getSelectedData(data, selected);
                 updateTable(currentData, false);
                 ;
             })
+        
+
     })
     </script>
 </body>
