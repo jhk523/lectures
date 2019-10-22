@@ -33,6 +33,28 @@
     svgHeight = 450;
     marginTop = 40;
     marginLeft = 20;
+    tableRectWidth = 60;
+    tableRectHeight = 30;
+    
+
+    function getSelectedData(data, year) {
+        for (var i = 0; i < data.length; i++) {
+            var currentData = data[i];
+            if (currentData.year === year) {
+                return currentData;
+            } 
+        }
+    }
+
+    function appendRect(table, height){
+        table.append('rect')
+            .attr('width', tableRectWidth)
+            .attr('height', tableRectHeight)
+            .attr('fill', 'none')
+            .attr('transform', (d, i) =>{
+                return translate(tableRectWidth * i, height)
+            }) 
+    }
 
     d3.json('data.json').then(function(data){
         data.forEach(function(d){
@@ -47,7 +69,6 @@
             })
         })
 
-
         let year_selection = d3.select('.years')
                                 .selectAll('option')
                                     .data(data)
@@ -55,28 +76,83 @@
                                     .text(k => k.year)
                                     .attr('id', k=> k.year)
 
+        let currentData = getSelectedData(data, '1982');
+        console.log(currentData)
+
         let table = d3.select('#plot')
                         .append('svg')
                         .attr('id', 'table')
                         .attr('width', svgWidth)
                         .attr('height', svgHeight)
-            
+        
+        let tableTitle = table.append('g')
+                        .attr('class', 'title-group')
+                        .selectAll('text')
+                        .data(['rank','team','W','D','L','win_rate','diff_game'])
+                        .enter()
+                        .append('g')
+                        .attr('class', 'title')
+                        .attr('transform', translate(marginLeft, marginTop))
+
+        let tableTitleRect = appendRect(tableTitle, 0)
+
+        let tableTitleTexts = tableTitle.append('text')
+                            .text(x => x)
+                            .attr('transform', (d, i) => {
+                                return translate(tableRectWidth * i, tableRectHeight)      
+                            })
+
+        let tableContents = d3.select('#table')
+                                .append('g')
+                                .attr('transform', translate(marginLeft, marginTop))
+                                .attr('class', 'content-group')
+                                .selectAll('g')
+                                .data(currentData.rankings)
+                                .enter()
+                                .append('g')
+                                .attr('class', 'content-list')
+                                .attr('transform', (d, i) =>{
+                                    return translate(0, tableRectHeight * (i+2))
+                                }) 
+        // g
+        let tableData = d3.selectAll('.content-list')
+                                .selectAll('g')
+                                .data(d => {
+                                    return [
+                                        d.rank,
+                                        d.team,
+                                        d.W,
+                                        d.D,
+                                        d.L,
+                                        d.win_rate,
+                                        d.diff_game
+                                    ];
+                                })
+                                .enter()
+                                .append('g')
+                                .attr('transform', (d, i) =>{
+                                    return translate(tableRectWidth * i, 0)
+                                });;
+
+        // rect                        
+        let tableRect = tableData                        
+                                .append('rect')
+                                .attr('width', tableRectWidth)
+                                .attr('height', tableRectHeight)
+                                .attr('fill', 'none')
+                                
+        let tableText = tableData.append('text')
+                                    .text(x => x)
+                                    .attr('transform')
+
         d3.select('.years')
             .on("change", function(d){
                 let selected = d3.select('.years').node().value;
                 console.log(selected);
+                currentData = getSelectedData(data, selected);
+                console.log(currentData);
             })
-        
-        // let table_title = table.append('g')
-        //                 .attr('id', 'title')
-        //                 .attr('transform', translate(marginLeft, marginTop))
-        //                 .data(test_rankings)
-        //                 .append('text')
-        //                     .text(x => x)
-
-        
     })
-
     </script>
 </body>
 </html>
