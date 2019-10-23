@@ -194,17 +194,44 @@
         }
 
         let lineChart = d3.select('#plot')
-                            .append('svg')
-                            .attr('id', 'chart')
-                            .attr('width', svgWidth)
-                            .attr('height', svgHeight)
-
+                            .append('svg');
+        lineChart.attr('id', 'chart')
+                    .attr('width', svgWidth)
+                    .attr('height', svgHeight)
+                            
         var chartX = d3.scaleLinear()
                     .domain([
                         d3.min(years),
                         d3.max(years)
                     ])
                     .range([0, width])
+
+        var chartY = d3.scaleLinear()
+                        .domain([
+                            d3.min(chartData, d => {
+                                return d3.min(d.value, datum => {
+                                    return datum.win_rate;
+                                })
+                            }),
+                            d3.max(chartData, d => {
+                                return d3.max(d.value, datum => {
+                                    return datum.win_rate;
+                                })
+                            })
+                        ])
+
+        lineChart.append('g')
+                    .call(chartX)
+        lineChart.append('g')
+                    .call(chartY)
+
+        let line = d3.line()
+                        .x(d => chartX(d.year))
+                        .y(d => chartY(d.win_rate))
+
+
+        console.log(lineChart);
+
         // var chartY = d3.scaleLinear()
         //             .domain([
         //                 d3.min(years),
