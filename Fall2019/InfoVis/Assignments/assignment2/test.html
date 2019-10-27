@@ -1,0 +1,531 @@
+
+<!DOCTYPE html>
+<head>
+	<meta charset="utf-8">
+	<title>Visualization bonhun hw1</title>
+</head>
+<body>
+	<div id="header">
+		<select id="select_year" onchange="update_year();">
+		</select>
+		<select id="select_line" onchange="update_line();">
+		<option value="WR">WR</option>
+		<option value="DG">DG</option>
+		</select>
+		<select id="select_bar" onchange="update_bar();">
+		<option value="W">W</option>
+		<option value="D">D</option>
+		<option value="L">L</option>
+		</select>
+	</div>
+	<div id="d3_svg">
+		<svg height="400" width="1600"></svg>
+	</div>
+	<script src="https://d3js.org/d3.v5.min.js"></script>
+<script>
+
+function translate(x, y) {
+	return "translate(" + x + "," + y + ")";
+}
+
+function getRandomArbitrary(min, max) {
+	return parseInt(Math.random() * (max - min) + min);
+}
+
+function getRandomColor() {
+	var letters = '0123456789ABCDEF';
+	var color = '#';
+	for (var i = 0; i < 6; i++) {
+		color += letters[Math.floor(Math.random() * 16)];
+	}
+	return color;
+}
+
+var svg = d3.select("svg"),
+	margin = {top: 20, right: 20, bottom: 20, left: 20},
+	width = +svg.attr("width") - margin.left - margin.right,
+	height = +svg.attr("height") - margin.top - margin.bottom,
+	margin_g = {top: 10, right: 20, bottom: 10, left: 20},
+	width_g = width/3 - margin_g.left - margin_g.right,
+	height_g = height - margin_g.top - margin_g.bottom;
+
+var table_div = d3.select("#table_div")
+
+var table_g = svg.append("g")
+    .attr("transform", translate(margin.left + margin_g.left, margin.top + margin_g.top));
+
+svg.append("g")
+    .attr("id", "line_g")
+    .attr("transform", translate(margin.left + margin_g.left*2 + margin_g.right + width_g, margin.top + margin_g.top));
+	
+var bar_g = svg.append("g")
+    .attr("id", "bar_g")
+    .attr("transform", translate(margin.left + margin_g.left*3 + margin_g.right*2 + width_g*2, margin.top + margin_g.top));
+
+/* table */
+let table_data = {
+	"years": [],
+	"year_idx": -1,
+	"raw_data": null,
+	"headers": ["rank", "team", "W", "D", "L", "win_rate", "diff_game"],
+	"table_entries": [],
+	"line_entries": [],
+	"teams": [],
+};
+
+d3.json("data.json").then(function(data){
+	table_data.raw_data = data;
+
+	table_data.years = [];
+
+	data.forEach(function(entry) {
+		table_data.years.push(entry.year)
+	})
+	table_data.years.sort();
+	table_data.year_idx = table_data.years.length > 0 ? 0 : -1;
+
+	let year_options = d3.select("#select_year")
+		.selectAll("option")
+		.data(table_data.years);
+
+	year_options.enter()
+			.append("option")
+			.attr("value", year => year)
+			.text(year => year)
+
+	year_options.exit()
+				.remove();
+
+	dup_teams = []
+	table_data.raw_data.forEach(function(entry) {
+		entry.rankings.forEach(function(rank_data) {
+			dup_teams.push(rank_data.team);
+		});
+	});
+	table_data.teams = Array.from(new Set(dup_teams)).sort();
+
+	update_year();
+	update_line();
+	update_bar();
+});
+
+
+function update_year() {
+	let selected_year = document.getElementById("select_year").value;
+	let selected_line = document.getElementById("select_line").value;
+	let selected_bar = document.getElementById("select_bar").value;
+
+	let year_options = d3.select("#select_year")
+		.selectAll("option")
+		.attr("selected", null)
+		.filter(function(year) {
+			return year === selected_year;
+		})
+		.attr("selected", "selected");
+
+	updateTableData(selected_year);
+	updateLineData(selected_year, selected_line);
+	updateBarData(selected_year, selected_bar);
+}
+
+let x_text = d3.scaleLinear()
+		  .domain([0,table_data.headers.length])
+		  .rangeRound([0, width_g]);
+
+let table_line_height = 30;
+
+let y_text = function(i) {
+	return table_line_height * i;
+};
+
+let thead_g = table_g.append("g")
+					.attr("id", "thead_g")
+    				.attr("transform", translate(0, 0));
+
+thead_g.selectAll("text")
+		.data(table_data.headers)
+		.enter()
+		.append("text")
+			.attr("x", (d, i) => x_text(i))
+			.attr("y", y_text(0))
+			.text(key => key);
+
+let tbody_g = table_g.append("g")
+					.attr("id", "tbody_g")
+    				.attr("transform", translate(0, table_line_height));
+
+function highlight(team) {
+	let selected_year = document.getElementById("select_year").value;
+	let selected_line = document.getElementById("select_line").value;
+	let selected_bar = document.getElementById("select_bar").value;
+
+	updateTableData(selected_year);
+	updateLineData(selected_year, selected_line);
+	updateBarData(selected_year, selected_bar);
+
+	tbody_g
+		.selectAll("text")
+		.attr("font-weight", null);
+
+	d3.select("#line_g")
+		.selectAll("path")
+		.attr("stroke-width", 1.5);
+
+	function brightness(x) {
+		return 'brightness(' + x + ')';
+	}
+
+	d3.select("#bar_g")
+		.selectAll("rect")
+		.style("filter", brightness(1.0));
+
+
+	tbody_g
+		.selectAll("." + team)
+		.selectAll("text")
+		.attr("font-weight", "bold");
+
+	d3.select("#line_g")
+		.selectAll("." + team)
+		.attr("stroke-width", 3.0);
+
+	d3.select("#bar_g")
+		.selectAll("." + team)
+		.style("filter", brightness(0.4))
+		.style("fill", "red");
+}
+
+function updateTableData(next_year) {
+	if (table_data.raw_data == null) {
+		return;
+	}
+
+	let rankings = null;
+
+	table_data.raw_data.forEach(function(entry) {
+		if (entry.year !== next_year)
+			return;
+		rankings = entry.rankings;
+	})
+
+	if (rankings === null) {
+		return;
+	}
+
+	table_data.table_entries = [];
+	for (let rank in rankings) {
+		let table_entry = [];
+		table_data.headers.forEach(function(header) {
+			if (header === "rank") {
+				table_entry.push(+rank + 1);
+			} else {
+				table_entry.push(rankings[rank][header]);
+			}
+		})
+		table_data.table_entries.push(table_entry);
+	}
+
+	let table_rows = tbody_g.selectAll("#table_rows")
+				.data(table_data.table_entries, entry => entry[1]);
+
+	// exit
+	table_rows.exit()
+		.remove();
+
+	// enter
+	table_rows.enter()
+			.append("g")
+			.attr("id", "table_rows")
+			.attr("class", entry => entry[1])
+    		.attr("transform", entry => translate(0, y_text(entry[0]-1)))
+			.style("opacity", 0)
+			.selectAll("text")
+			.data(entry => entry)
+				.enter()
+				.append("text")
+				.attr("x", (d, i) => x_text(i))
+				.text(d => d);
+
+	// update
+	table_rows.selectAll("text")
+				.data(entry => entry)
+				.text(d => d);
+
+	table_rows.transition()
+		.duration(500)
+		.attr("transform", entry => translate(0, y_text(entry[0]-1)));
+
+	// enter transition
+	tbody_g.selectAll("#table_rows")
+			.data(table_data.table_entries, entry => entry[1])
+			.transition()
+			.delay(500)
+			.duration(500)
+			.style("opacity", 1);
+
+	tbody_g.selectAll("#table_rows")
+		.data(table_data.table_entries, entry => entry[1])
+		.on("mouseenter", function(entry) {
+			highlight(entry[1]);
+		})
+		.on("mouseleave", function(entry) {
+			highlight("none")
+		});
+
+}
+
+/* line chart */
+
+let line_axis_x = d3.select("#line_g").append("g")
+		.attr("class", "line-axis--x")
+		.attr("transform", translate(0, height_g));
+		
+let line_axis_y = d3.select("#line_g").append("g")
+		.attr("class", "line-axis--y");
+
+let x_line = d3.scaleBand()
+			.range([0, width_g]);
+
+
+let y_line = d3.scaleLinear()
+	  		.range([height_g, 0]);
+
+function update_line() {
+	let selected_year = document.getElementById("select_year").value;
+	let selected_line = document.getElementById("select_line").value;
+
+	updateLineData(selected_year, selected_line);
+}
+
+function updateLineData(next_year, data_type) {
+	if (table_data.raw_data == null) {
+		return;
+	}
+
+	let teams = [];
+
+	table_data.raw_data.forEach(function(entry) {
+		if (entry.year !== next_year)
+			return;
+
+		entry.rankings.forEach(function(rank_data) {
+			teams.push(rank_data.team);
+		});
+	});
+
+	team_datas = {};
+
+	teams.forEach(function(team){
+		team_datas[team] = []
+	});
+	datas = [];
+
+	table_data.raw_data.forEach(function(entry) {
+		entry.rankings.forEach(function(rank_data) {
+			if (teams.includes(rank_data.team)) {
+				if (data_type === "WR") {
+					datas.push(+rank_data.win_rate);
+					team_datas[rank_data.team].push([entry.year, +rank_data.win_rate]);
+				} else {
+					datas.push(+rank_data.diff_game);
+					team_datas[rank_data.team].push([entry.year, +rank_data.diff_game]);
+				}
+			}
+		});
+	});
+
+	let y_line_color = d3.scaleOrdinal()
+						.domain(table_data.teams)
+			  			.range([
+						"#ff0000", "#00ff00", "#0000ff", "#d73027", "#f46d43",
+						"#fdae61", "#fee08b", "#d9ef8b", "#a6d96a", "#66bd63",
+						"#ffaa00", "#aaff00", "#aa00ff", "#d7ff27", "#f4adf3",
+						"#0aaef0", "#1e038b", "#19af8b", "#a6d9df", "#f1bd63",
+						]);
+
+	x_line.domain(table_data.years);
+	y_line.domain([d3.min(datas), d3.max(datas)]);
+
+	x_axis = d3.axisBottom(x_line);
+	x_axis.tickValues(["1990", "2001", "2010"]);
+	line_axis_x.transition()
+		.call(x_axis);
+	/*
+	line_axis_x.transition()
+		.call(d3.axisBottom(x_line).ticks(2));
+		*/
+
+	line_axis_y.transition()
+		.call(d3.axisLeft(y_line));
+
+	let line = d3.line()
+			.x(d => x_line(d[0]))
+			.y(d => y_line(d[1]));
+
+	let paths = d3.select("#line_g")
+					.selectAll("#line_path")
+					.data(teams, team => team);
+
+	// exit
+	paths.exit()
+		.remove();
+
+	// enter
+	paths.enter()
+		.append("path")
+		.attr("id", "line_path")
+		.attr("fill", "none")
+		.attr("class", team => team)
+		.attr("stroke", team => y_line_color(team))
+		.attr("stroke-width", 1.5)
+		.attr("d", team => line(team_datas[team]))
+		.style("opacity", 0)
+		.on("mouseenter", function(team) {
+			highlight(team);
+		})
+		.on("mouseleave", function(team) {
+			highlight("none")
+		});
+
+	paths
+		.attr("stroke", team => y_line_color(team))
+		.transition()
+		.duration(500)
+		.attr("d", team => line(team_datas[team]));
+
+	// enter transition
+	d3.select("#line_g").selectAll("path")
+		.data(teams, team => team)
+			.transition()
+			.delay(500)
+			.duration(500)
+			.style("opacity", 1);
+}
+
+/* bar chart */
+let bar_axis_x = d3.select("#bar_g").append("g")
+		.attr("class", "line-axis--x")
+		.attr("transform", translate(0, height_g));
+		
+let bar_axis_y = d3.select("#bar_g").append("g")
+		.attr("class", "line-axis--y");
+
+let x_bar = d3.scaleBand()
+			.range([0, width_g]);
+
+let y_bar = d3.scaleLinear()
+	  		.rangeRound([height_g, 0]);
+
+function update_bar() {
+	let selected_year = document.getElementById("select_year").value;
+	let selected_bar = document.getElementById("select_bar").value;
+
+	updateBarData(selected_year, selected_bar);
+}
+
+function updateBarData(next_year, data_type) {
+	if (table_data.raw_data == null) {
+		return;
+	}
+
+	let teams = [];
+
+	table_data.raw_data.forEach(function(entry) {
+		if (entry.year !== next_year)
+			return;
+
+		entry.rankings.forEach(function(rank_data) {
+			teams.push(rank_data.team);
+		});
+	});
+
+	team_datas = {};
+
+	teams.forEach(function(team){
+		team_datas[team] = -1;
+	});
+	datas = [];
+
+	table_data.raw_data.forEach(function(entry) {
+		if (entry.year !== next_year)
+			return;
+
+		entry.rankings.forEach(function(rank_data) {
+			if (teams.includes(rank_data.team)) {
+				if (data_type === "W") {
+					datas.push(+rank_data.W);
+					team_datas[rank_data.team] = +rank_data.W;
+				} else if (data_type === "D") {
+					datas.push(+rank_data.D);
+					team_datas[rank_data.team] = +rank_data.D;
+				} else if (data_type === "L") {
+					datas.push(+rank_data.L);
+					team_datas[rank_data.team] = +rank_data.L;
+				}
+			}
+		});
+	});
+
+	let y_bar_color = d3.scaleOrdinal()
+						.domain(table_data.teams)
+			  			.range([
+						"#ff0000", "#00ff00", "#0000ff", "#d73027", "#f46d43",
+						"#fdae61", "#fee08b", "#d9ef8b", "#a6d96a", "#66bd63",
+						"#ffaa00", "#aaff00", "#aa00ff", "#d7ff27", "#f4adf3",
+						"#0aaef0", "#1e038b", "#19af8b", "#a6d9df", "#f1bd63",
+						]);
+
+	x_bar.domain(teams);
+	y_bar.domain([d3.min(datas)-(d3.max(datas)-d3.min(datas))/10, d3.max(datas)]);
+
+	bar_axis_x.transition()
+		.call(d3.axisBottom(x_bar));
+
+	bar_axis_y.transition()
+		.call(d3.axisLeft(y_bar));
+
+	let bars = d3.select("#bar_g")
+				.selectAll("rect")
+				.data(teams, team => team);
+
+	// exit
+	bars.exit()
+		.remove();
+
+	// enter
+	bars.enter()
+		.append("rect")
+		.attr("x", team => x_bar(team))
+		.attr("y", team => y_bar(team_datas[team]))
+		.attr("class", team => team)
+		.attr("width", x_bar.bandwidth())
+		.attr("height", team => height_g - y_bar(team_datas[team]))
+		.style("fill", team => y_bar_color(team))
+		.style("opacity", 0)
+		.on("mouseenter", function(team) {
+			highlight(team);
+		})
+		.on("mouseleave", function(team) {
+			highlight("none")
+		});
+
+	bars
+		.style("fill", team => y_bar_color(team))
+		.transition()
+		.duration(500)
+		.attr("x", team => x_bar(team))
+		.attr("y", team => y_bar(team_datas[team]))
+		.attr("width", x_bar.bandwidth())
+		.attr("height", team => height_g - y_bar(team_datas[team]));
+
+	d3.select("#bar_g")
+		.selectAll("rect")
+		.data(teams, team => team)
+			.transition()
+			.delay(500)
+			.duration(500)
+			.style("opacity", null);
+}
+
+</script>
+</body>

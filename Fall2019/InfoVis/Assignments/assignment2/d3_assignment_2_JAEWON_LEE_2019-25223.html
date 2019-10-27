@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>d3.js Assignment 2 - JAEWON LEE 2019-25223</title>
+    <style type="text/css">
+        * {
+            box-sizing: border-box;
+        }
+        .chart-container {
+            /*border: 2px solid silver;*/
+            padding: 20px;
+        }
+
+        .display-none {
+            display: none;
+        }
+
+        table, tr { height: 100%; }
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        button {
+            cursor: pointer;
+        }
+        .section {
+            display: inline-block;
+        }
+
+        .bar {
+            opacity: 0.8;
+        }
+
+        .transition-bar {
+            transition: opacity 0.4s ease-in;
+        }
+
+        .loading {
+            opacity: 0;
+        }
+
+        .highlighted-bar {
+            opacity: 1;
+        }
+
+        .highlight-text {
+            font-weight: bold;
+        }
+
+        .table-heading {
+            margin-bottom: 25px;
+        }
+
+        .sortable-table-container {
+            min-width: 450px;
+            min-height: 450px;
+        }
+
+        .combo-box-container {
+            margin: 10px;
+        }
+
+        .sortable-table-container tr.table-row {
+            position: absolute;
+            height: 46px;
+            width: 400px;
+        }
+
+        .table tr.table-row td {
+            text-align: center;
+        }
+
+        .table tr.table-row td:first-child,
+        .table tr.table-row td:nth-child(3),
+        .table tr.table-row td:nth-child(4),
+        .table tr.table-row td:nth-child(5){
+            min-width: 44px;
+        }
+
+        .table tr.table-row td:nth-child(6){
+            min-width: 70px;
+        }
+
+        .table tr.table-row td:nth-child(2) {
+            min-width: 100px;
+        }
+
+        .table tr.table-row td:last-child {
+            min-width: 70px;
+        }
+
+        #table-data {
+            position: relative;
+        }
+
+        #table-data td {
+            padding: 10px;
+            /*border: 2px solid black;*/
+            font-size: 1.2em;
+            position: relative;
+        }
+
+        .inline-block {
+            display: inline-block;
+            margin: 20px;
+        }
+
+        .top-aligned {
+            vertical-align: top;
+        }
+
+        /* Line CSS */
+        .axis path,
+        .axis line {
+            fill: none;
+             shape-rendering: crispEdges;
+        }
+
+        .line {
+            fill: none;
+            stroke-width: 2px;
+        }
+
+        .line-highlighted {
+            stroke-width: 5px;
+        }
+    </style>
+</head>
+<body>
+<div class="chart-container">
+    <div class="section">
+        <h2>KBO Rankings</h2>
+        <div class="combo-box-container">
+            <select id="year"></select>
+        </div>
+        <div class="combo-box-container">
+            <select id="win-rate-diff-game">
+                <option value="win_rate">WR</option>
+                <option value="diff_game">DG</option>
+            </select>
+        </div>
+        <div class="combo-box-container">
+            <select id="win-loss-draw">
+                <option value="W">W</option>
+                <option value="D">D</option>
+                <option value="L">L</option>
+            </select>
+        </div>
+        <div id="componentContainer">
+            <!-- Table: Dynamically generated -->
+            <div class="inline-block">
+                <table class="table table-heading">
+                    <tr class="table-row">
+                        <td>Rank</td>
+                        <td>Team</td>
+                        <td>W</td>
+                        <td>D</td>
+                        <td>L</td>
+                        <td>win_rate</td>
+                        <td>diff_game</td>
+                    </tr>
+                </table>
+                <div class="sortable-table-container">
+                    <table class="table" id="table-data"></table>
+                </div>
+            </div>
+            <div id="lineChart" class="inline-block top-aligned"></div>
+            <!-- Bar chart placeholder -->
+            <div id="barChart" class="inline-block top-aligned"></div>
+        </div>
+    </div>
+</div>
+</body>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+</html>
+<script type="text/javascript">
+    ;(function() {
+        "use strict";
+        // d3 import is required
+        if (!d3) {
+            throw new Error("d3 is not defined. " +
+                "Check the script url or internet connectivity!");
+        }
+
+        /**
+         * Global Variable
+         * ====================
+         * */
+        var DOM_ROOT = "body";
+        var CHART_ROOT = 'svg';
+        var rootElKey = 'rootEl';
+        var DEFAULT_WIDTH = 400;
+        var DEFAULT_HEIGHT = 400;
+        var CHART_TYPES = {
+            BAR: "__BAR__",
+            SCATTER: "__SCATTER__",
+            LINE: "__LINE__"
+        };
+        var defaultOptions = {
+            margins: {
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: 20
+            },
+            yAxis: {
+                max: null,
+                min: null
+            },
+            xAxis: {
+                max: null,
+                min: null
+            },
+            width: DEFAULT_WIDTH,
+            height: DEFAULT_HEIGHT,
+            transition: {
+                duration: 500,
+                step: 50
+            }
+        };
+        // Required options for creating chart
+        var REQUIRED_OPTIONS = ['xAxis', 'yAxis', 'xAxis.scale', 'yAxis.scale', rootElKey];
+
+        /**
+         * Instantiator of the library
+         * */
+        function d3Charts(options) {
+            if (!(this instanceof d3Charts)) {
+                return new d3Charts(options);
+            }
+            this.options = options;
+            // Depends on what data we feed in and what chart we draw
+            this.data = null;
+            this.type = null;
+            this.created = false;
+        }
+
+        /**
+         * Private functions
+         * ==============================
+         * */
+
+        function isObject(input) {
+            return Object.prototype.toString.call(input) === "[object Object]";
+        }
+
+        /**
+         * get stack trace. Used in conjunction with throwError
+         * */
+        var getStackTrace = function (errMsg) {
+            var err = new Error(errMsg);
+            return err.stack;
+        };
+
+        /**
+         * Throw error
+         * */
+        function throwError(errMsg) {
+            throw new Error(getStackTrace(errMsg));
+        }
+
+        /**
+         * Display detailed error with unlimited parameter info. E.g. throwDetailedError(obj, "error", msg)
+         * To display object contents as error message, don't concatenate string, but pass as parameter
+         * */
+        function throwDetailedError() {
+            throw new Error(formattedLogString(Array.prototype.slice.call(arguments)));
+        }
+
+        /**
+         * Format objects printed onto the console in a string
+         * so that the whole object is displayed properly.
+         * */
+        function formattedLogString(args) {
+            return args.map(printObjFormatted).join('');
+        }
+
+        /**
+         * Will make this method smarter on request
+         * */
+        function printObjFormatted(item) {
+            return isObject(item) ? JSON.stringify(item) : item || toString.call(item);
+        }
+
+        /**
+         * Get value of nested option values.
+         * Return null if value does not exist
+         * E.g. Value
+         * */
+        function getOption(key) {
+            var keys = key.split(".");
+            var value = this.options, currentKey;
+            var defaultValues = defaultOptions;
+            for (var i = 0; i < keys.length; i++) {
+                currentKey = keys[i];
+                if (value.hasOwnProperty(currentKey)) {
+                    value = value[currentKey];
+                } else {
+                    // Check default values
+                    for (var j = 0; j < keys.length; j++) {
+                        currentKey = keys[i];
+                        if (defaultValues.hasOwnProperty(currentKey)) {
+                            defaultValues = value[currentKey];
+                        } else {
+                            return null;
+                        }
+                    }
+                    if (defaultValues) {
+                        return defaultValues;
+                    }
+                    return null;
+                }
+            }
+            return value;
+        }
+
+        /**
+         * @param {Array} properties Check the chart options to ensure
+         * that all the required properties have been created.
+         * If missing, throw error.
+         * */
+        function checkRequiredOptions(properties) {
+            var that = this;
+            properties.forEach(function(propertyKey) {
+                var option = getOption.call(that, propertyKey);
+                if (!option) {
+                    throwDetailedError(`Could not find property: options.${propertyKey}\n`,
+                        JSON.stringify(that.options, undefined, 4));
+                }
+            });
+        }
+
+        /**
+         * Perform necessary validations
+         * before proceeding
+         * @this {d3Charts}
+         * */
+        function validateOptions() {
+            // If chart has already been created, don't re-initialize
+            if (this.created) {
+                throw new Error("Chart instance has already been created ...");
+            }
+            // Check for all required options
+            checkRequiredOptions.call(this, REQUIRED_OPTIONS);
+        }
+
+        /**
+         * @param {string} elDomKey The dom element
+         * @return The DOM element in question
+         * */
+        function createRootElement(elDomKey) {
+            var el = d3.select(elDomKey);
+            if (!el) {
+                console.warn("DOM element could not be queried with key: ", elDomKey
+                    , ". Appending chart to body tag");
+                el = d3.select(DOM_ROOT);
+            }
+            // Lastly, append svg element
+            el = el.append(CHART_ROOT);
+            // Set appropriate width and height properties
+            var options = this.options, margins = options.margins;
+            el.attr("width", options.width);
+            el.attr("height", options.height);
+            return el.append("g").attr("transform", `translate(${margins.left}, ${margins.top})`);
+        }
+
+        /**
+         * @param input The input value to compare
+         * */
+        function isFunction(input) {
+            return typeof input === "function";
+        }
+
+        /**
+         * Given a key, get the maximum value from dataset
+         * by comparing the values stored in a particular key
+         * of the hashmap objects
+         * @param data The given dataset
+         * @param key The key that will be used to compare the individual datum
+         * */
+        function getMax(data, key) {
+            return d3.max(data, function(d) { return d[key]; })
+        }
+
+        /**
+         * Initialize the default properties
+         * */
+        function initializeOptions() {
+            var options = this.options;
+            // Apply default options if it doesnt exist
+            // Otherwise, user-defined options
+            Object.keys(defaultOptions).forEach(function(key) {
+                // Apply default if it doesn't exist
+                if (!options.hasOwnProperty(key)) {
+                    options[key] = defaultOptions[key];
+                }
+            });
+        }
+
+        /**
+         * Generate scales according to user-defined options
+         * */
+        function scaleGenerator(xScale, yScale) {
+            var margins = this.options.margins;
+            var height = this.options.height - margins.top - margins.bottom;
+            var width = this.options.width - margins.left - margins.right;
+
+            // Generate the scales
+            // SVG coordinates starts from the top left hand corner
+            var yScaleObj = yScale
+                .range([height, 0]);
+
+            // Generate scale for x Axis
+            var xScaleObj = xScale
+                .range([0, width]);
+
+            // Scale the range of the data in the domains
+            return {
+                xScale: xScaleObj,
+                yScale: yScaleObj,
+                height: height,
+                width: width
+            }
+        }
+
+        /**
+         * A generic function for generating charts
+         * */
+        function chartGenerator(that, fn) {
+            validateOptions.call(that);
+            initializeOptions.call(that);
+            var options = that.options;
+            var rootEl = options[rootElKey];
+            var el = createRootElement.call(that, rootEl);
+            that.rootEl = el;
+            that.created = true;
+            // Generate scales
+            var scales = scaleGenerator.call(that,
+                options.xAxis.scale, options.yAxis.scale);
+            return fn.call(this, el, scales);
+        }
+
+        /**
+         * Refresh bar chart
+         * */
+        function refreshBarChart(data) {
+            var that = this;
+            var scales = scaleGenerator.call(that,
+                that.options.xAxis.scale, that.options.yAxis.scale);
+            var xScale = scales.xScale;
+            var yScale = scales.yScale;
+            var yAxisOptions = that.options.yAxis;
+            var transitionDuration = getOption.call(that, "transition.duration");
+            var stepDuration = getOption.call(that, "transition.step");
+
+            // Scale the range of the data in the domains
+            xScale.domain(data.map(function(d) { return d.x; }));
+            var yScaleVal = [yAxisOptions.min || 0, yAxisOptions.max || +getMax(data, "y")];
+            if (yScaleVal[0] === yScaleVal[1]) {
+                yScaleVal[1]++;
+            }
+            yScale.domain(yScaleVal);
+
+            var svg = this.rootEl;
+            var t = svg.transition().duration(transitionDuration);
+
+            // Generate the appropriate DOM elements
+            svg.select("g.x-axis")
+                .attr("transform", `translate(0, ${scales.height})`)
+                .transition()
+                .call(d3.axisBottom(xScale));
+
+            // Rescale accordingly
+            svg.select("g.y-axis")
+                .transition()
+                .call(d3.axisLeft(yScale).tickFormat(function(d){ return d; }).ticks(10));
+
+            // Get Bars
+            // a unique id is very important!
+            //  var bars = svg.selectAll("rect.bar").data(data, d => d.team);
+            var bars = svg.select("g.data-group").selectAll("rect.bar").data(data, d => d.x);
+            bars
+                .on("mouseover", null)
+                .on("mouseout", null)
+                .exit().remove();
+
+            var called = false;
+
+            // Hidden initially
+            var newBars = bars.join("rect")
+                .on("mouseover", null)
+                .on("mouseout", null);
+            newBars.attr("class", "bar loading transition-bar");
+
+            // Sort the bars
+            bars.order()
+                .transition(t)
+                .delay((d, i) => i * stepDuration)
+                .attr("x", d => xScale(d.x))
+                .attr("width", xScale.bandwidth())
+                .attr("y", d => yScale(d.y))
+                .attr("height", d => scales.height - yScale(d.y))
+                .attr("class", "bar transition-bar")
+                .on("end", function() {
+                    if(!called) {
+                        called = true;
+                    } else {
+                        return;
+                    }
+                    newBars
+                        .attr("class", "bar transition-bar")
+                        .attr("x", d => xScale(d.x))
+                        .attr("y", d => yScale(d.y))
+                        .attr("width", xScale.bandwidth())
+                        .attr("height", d => scales.height - yScale(d.y))
+                        // hard code this for now
+                        .on("mouseover", function(d) {
+                            highlightElementsByTeam(d.x);
+                        })
+                        .on("mouseout", function(d) {
+                            reverseHighlightElementsByTeam(d.x);
+                        });
+
+                    var chartAttrs = getOption.call(that, "chartElement.attrs");
+                    if (chartAttrs) {
+                        Object.keys(chartAttrs).forEach((key) => {
+                            newBars.attr(key, chartAttrs[key]);
+                        });
+                    }
+                });
+        }
+
+        function refreshLineChart(data) {
+            var that = this;
+            var yAxisOptions = that.options.yAxis;
+            var scales = scaleGenerator.call(that,
+                that.options.xAxis.scale, that.options.yAxis.scale);
+            var xScale = scales.xScale;
+            var yScale = scales.yScale;
+            var transitionDuration = getOption.call(that, "transition.duration");
+
+            // Scale the range of the data in the domains
+            xScale.domain([d3.min(data, function(series) {
+                return d3.min(series.dataPoints, function(v) {
+                    return v.x;
+                });
+            }),
+                yAxisOptions.max ||
+                d3.max(data, function(series) {
+                    return d3.max(series.dataPoints, function(v) {
+                        return v.x;
+                    });
+                })]);
+
+            // Set min and max dynamically
+            yScale.domain([yAxisOptions.min ||
+                d3.min(data, function(series) {
+                    return d3.min(series.dataPoints, function(v) {
+                        return v.y;
+                    });
+                }),
+                yAxisOptions.max ||
+                d3.max(data, function(series) {
+                    return d3.max(series.dataPoints, function(v) {
+                        return v.y;
+                    });
+                })
+            ]);
+
+            var svg = this.rootEl;
+
+            // Generate the appropriate DOM elements
+            svg.select("g.x-axis")
+                .attr("transform", `translate(0, ${scales.height})`)
+                .transition()
+                .call(d3.axisBottom(xScale));
+
+            // Rescale accordingly
+            svg.select("g.y-axis")
+                .transition()
+                .call(d3.axisLeft(yScale).tickFormat(function(d){ return d; }).ticks(10));
+
+            var line = d3.line()
+                .defined(d => !isNaN(d.y))      // Handle missing data
+                .x(d => xScale(d.x))
+                .y(d => yScale(d.y));
+
+            var called = false; // Only run callback once
+            // group containing lines
+            // var lines = svg.select("g.data-group").selectAll("path.line").data(data);
+            var lines = svg.select("g.data-group").selectAll("path").data(data);
+
+            // Update existing lines
+            lines.attr("datakey", d => d.category);
+
+            // Add new path
+            var newLines = lines.enter().append("g")
+                .attr("class", "line-chart")
+                .append("path");
+
+            // Draw line and set it to hidden
+            newLines
+                .attr("class", "line loading transition-bar")
+                .attr('pointer-events', 'visibleStroke')
+                .attr("datakey", d => d.category)
+                .attr("d", d => line(d.dataPoints));
+
+            lines
+                .transition()
+                .duration(transitionDuration)
+                .attr("class", "line transition-bar")
+                .attr("datakey", d => d.category)
+                .attr("d", d => line(d.dataPoints))
+                .on("end", function() {
+                    if (called) {
+                        return;
+                    }
+                    called = true;
+                    newLines
+                        .transition()
+                        .duration(transitionDuration + 100)
+                        .attr('pointer-events', 'visibleStroke')
+                        .attr("datakey", d => d.category)
+                        .attr("class", "line transition-bar");
+
+                    newLines
+                        .on("mouseover", function(d) {
+                            highlightElementsByTeam(d.category);
+                        })
+                        .on("mouseout", function(d) {
+                            reverseHighlightElementsByTeam(d.category);
+                        });
+
+                    var chartAttrs = getOption.call(that, "chartElement.attrs");
+                    if (chartAttrs) {
+                        Object.keys(chartAttrs).forEach((key) => {
+                            newLines.attr(key, chartAttrs[key]);
+                        });
+                    }
+                });
+
+            lines
+                .on("mouseover", function(d) {
+                    highlightElementsByTeam(d.category);
+                })
+                .on("mouseout", function(d) {
+                    reverseHighlightElementsByTeam(d.category);
+                });
+
+            var chartAttrs = getOption.call(that, "chartElement.attrs");
+            if (chartAttrs) {
+                Object.keys(chartAttrs).forEach((key) => {
+                    lines.attr(key, chartAttrs[key]);
+                });
+            }
+            // Finally, remove old lines and detach any event listeners
+            lines.exit().remove();
+        }
+
+        /**
+         * Refresh bar chart
+         * */
+        function refreshScatterPlot(data) {
+            var that = this;
+            that.type = CHART_TYPES.SCATTER;
+            var scales = scaleGenerator.call(that, d3.scaleLinear(), d3.scaleLinear());
+            var xScale = scales.xScale;
+            var yScale = scales.yScale;
+
+            // Scale the range of the data in the domains
+            xScale.domain([that.options.xAxis.min, getMax(data, "cx")]);
+            yScale.domain([that.options.yAxis.min, getMax(data, "cy")]);
+
+            var svg = this.rootEl;
+
+            // Generate the appropriate DOM elements
+            svg.select("g.x-axis")
+                .attr("transform", `translate(0, ${scales.height})`)
+                .call(d3.axisBottom(xScale));
+
+            // Rescale accordingly
+            svg.select("g.y-axis")
+                .call(d3.axisLeft(yScale).tickFormat(function(d) { return d;}).ticks(10));
+
+            // Get circles
+            var circles = svg.select("g.data-group").selectAll(".scatter-point").data(data);
+
+            // Apply changes
+            circles
+                .transition()
+                .duration(500)
+                .attr("fill", function(d) { return d.color; })
+                .attr("cx", function(d) { return xScale(d.cx); })
+                .attr("cy", function(d) { return yScale(d.cy); })
+                .attr("r", function(d) {return d.radius; });
+        }
+
+        /**
+         * @param {object} data The object that we are aiming to create
+         * @param {object} options Options passed to custom chart.
+         * A 'init' function must be specified.
+         * @this {d3Charts}
+         * */
+        function createCustomChart(data, options) {
+            // Check to see
+            checkRequiredOptions(["init"]);
+            // init must be a function
+            if (!isFunction(options.init)) {
+                throwDetailedError("'init' must be a function. It is a ",
+                    Object.prototype.toString.call(options.init));
+            }
+            // perform initialization
+            data.init();
+
+            var customEvents = options.customEvents;
+            // Required properties include callback function
+            // element selectors
+            var requiredEventProperties = ["cb"];
+            if (Array.isArray(customEvents)) {
+                // TODO: Add custom events. We are going to use this to create events
+                // For each of our function
+                customEvents.forEach(function(event) {
+                    checkRequiredOptions(requiredEventProperties);
+                });
+            }
+        }
+
+        /**
+         * Public API
+         * ================================
+         * */
+
+        /**
+         * @param {Array} data The data that we will be visualizing
+         * */
+        d3Charts.prototype.scatterPlot = function scatterPlot(data) {
+            var that = this;
+            // Set chart properties
+            var barChartGen = chartGenerator(that, function(rootEl, scales) {
+                that.type = CHART_TYPES.SCATTER;
+                var height = scales.height;
+                var yScale = scales.yScale;
+                var xScale = scales.xScale;
+
+                // Scale the range of the data in the domains
+                xScale.domain([that.options.xAxis.min, getMax(data, "cx")]);
+                yScale.domain([that.options.yAxis.min, getMax(data, "cy")]);
+
+                // X axis
+                rootEl.append("g")
+                    .attr("class", "x-axis")
+                    .attr("transform", `translate(0, ${height})`)
+                    .transition()
+                    .call(d3.axisBottom(xScale));
+
+                // Y axis
+                rootEl.append("g")
+                    .attr("class", "y-axis")
+                    .transition()
+                    .call(d3.axisLeft(yScale).tickFormat(function(d){ return d; }).ticks(10));
+
+                // Data group
+                var dataGroup = rootEl.append("g")
+                    .attr("class", "data-group");
+
+                // Draw circles
+                dataGroup.
+                selectAll(".scatter-point")
+                    .data(data)
+                    .enter().append("circle")
+                    .attr("class", "scatter-point")
+                    .attr("fill", function(d) { return d.color; })
+                    .attr("cx", function(d) { return xScale(d.cx); })
+                    .attr("cy", function(d) { return yScale(d.cy); })
+                    .attr("r", function(d) { return d.radius; });
+            });
+            return that;
+        };
+
+        /**
+         * @param {Array} data The data that we will be visualizing
+         * */
+        d3Charts.prototype.barChart = function barChart(data) {
+            var that = this;
+            this.data = data;
+            chartGenerator(that, function(rootEl, scales) {
+                that.type = CHART_TYPES.BAR;
+                var yAxisOptions = that.options.yAxis;
+                var xScale = scales.xScale;
+                var yScale = scales.yScale;
+
+                // Scale the range of the data in the domains
+                xScale.domain(data.map(function(d) { return d.x; }));
+                var yScaleVal = [yAxisOptions.min || 0, yAxisOptions.max || +getMax(data, "y")];
+                if (yScaleVal[0] === yScaleVal[1]) {
+                    yScaleVal[1]++;
+                }
+                yScale.domain(yScaleVal);
+
+                // Generate the appropriate DOM elements
+                rootEl.append("g")
+                    .attr("class", "x-axis")
+                    .attr("transform", `translate(0, ${scales.height})`)
+                    .transition()
+                    .call(d3.axisBottom(xScale));
+
+                // Y axis
+                rootEl.append("g")
+                    .attr("class", "y-axis")
+                    .transition()
+                    .call(d3.axisLeft(yScale).tickFormat(function(d){ return d; }).ticks(10));
+
+                // group containing bars
+                var dataGroup = rootEl.append("g")
+                    .attr("class", "data-group");
+
+                // Draw bars
+                dataGroup = dataGroup.
+                    selectAll("rect.bar")
+                    .data(data, d => d.x);
+
+                // Enter
+                dataGroup = dataGroup.join("rect");
+                // Set
+                that.dataGroup = dataGroup;
+
+                dataGroup
+                    .attr("class", "bar transition-bar")
+                    .attr("x", function(d) { return xScale(d.x); })
+                    .attr("y", function(d) { return yScale(d.y); })
+                    .attr("width", xScale.bandwidth())
+                    .attr("height", d => scales.height - yScale(d.y))
+                    // hard code this for now
+                    .on("mouseover", function(d) {
+                        highlightElementsByTeam(d.x);
+                    })
+                    .on("mouseout", function(d) {
+                        reverseHighlightElementsByTeam(d.x);
+                    });
+
+                var chartAttrs = getOption.call(that, "chartElement.attrs");
+                if (chartAttrs) {
+                    Object.keys(chartAttrs).forEach((key) => {
+                        dataGroup.attr(key, chartAttrs[key]);
+                    });
+                }
+
+            });
+            return that;
+        };
+
+        d3Charts.prototype.lineChart = function lineChart(data) {
+            var that = this;
+            chartGenerator(that, function(rootEl, scales) {
+                that.type = CHART_TYPES.LINE;
+                var yAxisOptions = that.options.yAxis;
+                var xScale = scales.xScale;
+                var yScale = scales.yScale;
+
+                // Scale the range of the data in the domains
+                xScale.domain([d3.min(data, function(series) {
+                        return d3.min(series.dataPoints, function(v) {
+                            return v.x;
+                        });
+                    }),
+                    yAxisOptions.max ||
+                    d3.max(data, function(series) {
+                        return d3.max(series.dataPoints, function(v) {
+                            return v.x;
+                        });
+                    })]);
+
+                // Min and max
+                yScale.domain([yAxisOptions.min ||
+                    d3.min(data, function(series) {
+                        return d3.min(series.dataPoints, function(v) {
+                            return v.y;
+                        });
+                    }),
+                    yAxisOptions.max ||
+                    d3.max(data, function(series) {
+                        return d3.max(series.dataPoints, function(v) {
+                            return v.y;
+                        });
+                    })
+                ]);
+
+                // Generate the appropriate DOM elements
+                rootEl.append("g")
+                    .attr("class", "x-axis")
+                    .attr("transform", `translate(0, ${scales.height})`)
+                    .transition()
+                    .call(d3.axisBottom(xScale));
+
+                // Y axis
+                rootEl.append("g")
+                    .attr("class", "y-axis")
+                    .transition()
+                    .call(d3.axisLeft(yScale).tickFormat(function(d){ return d; }).ticks(10));
+
+                // group containing lines
+                var dataGroup = rootEl.append("g")
+                    .attr("class", "data-group");
+
+                // Draw lines
+                dataGroup = dataGroup.selectAll(".line").data(data);
+
+                // Define line-generating function
+                var line = d3.line()
+                    // .curve(d3.curveMonotoneX)    // In case we want a rounder shaped curve
+                    .defined(d => !isNaN(d.y))      // Handle missing data
+                    .x(d => xScale(d.x))
+                    .y(d => yScale(d.y));
+
+                // Enter
+                var lines = dataGroup.enter().append("g").attr("class", "line-chart");
+                lines = lines.append("path");
+                lines
+                    .attr("class", "line")
+                    .attr("d", d => line(d.dataPoints))
+                    .attr('pointer-events', 'visibleStroke')
+                    .attr("datakey", d => d.category)
+                    // Since we are not going to convert this into a library
+                    // Just hard code it
+                    .on("mouseover", function(d) {
+                        highlightElementsByTeam(d.category);
+                    })
+                    .on("mouseout", function(d) {
+                        reverseHighlightElementsByTeam(d.category);
+                    });
+
+
+                var chartAttrs = getOption.call(that, "chartElement.attrs");
+                if (chartAttrs) {
+                    Object.keys(chartAttrs).forEach((key) => {
+                        lines.attr(key, chartAttrs[key]);
+                    });
+                }
+            });
+            return that;
+        };
+
+        /**
+         * Refresh current chart
+         * @param {Array} data The data that we will use to replace existing data
+         * */
+        d3Charts.prototype.refresh = function refresh(data) {
+            switch(this.type) {
+                case CHART_TYPES.BAR:
+                    refreshBarChart.call(this, data);
+                    break;
+                case CHART_TYPES.SCATTER:
+                    refreshScatterPlot.call(this, data);
+                    break;
+                case CHART_TYPES.LINE:
+                    refreshLineChart.call(this, data);
+                    break;
+            }
+            this.data = data;
+            return this;
+        };
+
+        /**
+         * Create custom charts
+         * */
+        d3Charts.prototype.customChart = function customChart(data, options) {
+            createCustomChart.call(this, data, options);
+            return this;
+        };
+
+        if (window.d3Charts === undefined) {
+            window.d3Charts = d3Charts;
+        } else {
+            throw new Error("d3Charts is already defined ....")
+        }
+
+    })();
+
+    /**
+     * Implementation details
+     * For the assignment
+     * =============================================
+     * */
+
+    var barChart, lineChart;
+    var prevYear;
+    var teamColors;
+    var isTransitioning = false;
+
+    /**
+     * Initialize combo-boxes with values dynamically
+     * and attach necessary event listeners.
+     * */
+    function initializeComboBoxes(data) {
+        // Year
+        d3.select("#year").selectAll(".year-options")
+            .data(data)
+            .enter().append("option")
+            .attr("value", d => d.year)
+            .text(d => d.year);
+
+        // Set global accessor ...
+        prevYear = document.getElementById("year").value;
+    }
+
+    /**
+     * Event handler for handling table updates
+     * @param data
+     * */
+    function updateTable(data) {
+        isTransitioning = true;
+        // Replace old tr with new tr
+        var tbody = d3.select("#table-data > tbody");
+
+        // join new data to existing ones
+        var trs = tbody.selectAll("tr").data(data, d => d.team);
+        const t = d3.select("#table-data").transition().duration(500);
+
+        // Add new rows for new piece of data
+        var newTrs = trs.enter().append("tr");
+        newTrs.attr("class", "table-row loading transition-bar");
+        var called = false;
+
+        trs
+            .on("mouseover", function(d) {
+                highlightElementsByTeam(d.team);
+            })
+            .on("mouseout", function(d) {
+                reverseHighlightElementsByTeam(d.team);
+            });
+
+        // Handle Duplicate ranks
+        var ranks = {};
+
+        // Absolutely position rows
+        // and handle duplicates :)
+        var positionRows = d => {
+            var rank = d.rank;
+            if (ranks.hasOwnProperty(rank)) {
+                ranks[rank] += 1;
+            } else {
+                ranks[rank] = 0;
+            }
+            var position = rank - 1 + ranks[rank];
+            return `top: ${position * 46}px;`;
+        };
+
+        // Update existing data
+        trs.order()
+            .transition(t)
+            .delay((d, i) => i * 50)
+            .attr("class", "table-row transition-bar")
+            .attr("datakey", d => d.team)
+            .attr("style", positionRows)
+            .on("end", function() {
+                if (called) {
+                    return;
+                }
+                called = true;
+                // Add the new teams
+                newTrs
+                    .transition()
+                    .attr("class", "table-row transition-bar")
+                    .attr("datakey", d => d.team)
+                    .attr("style", positionRows);
+
+                newTrs
+                    .on("mouseover", function(d) {
+                        highlightElementsByTeam(d.team);
+                    })
+                    .on("mouseout", function(d) {
+                        reverseHighlightElementsByTeam(d.team);
+                    });
+
+                newTrs
+                    .selectAll("td")
+                    .data(function(d){
+                        // Order according to the demo
+                        // manually ...
+                        return [
+                            d.rank,
+                            d.team,
+                            //  d.games,
+                            d.W,
+                            d.D,
+                            d.L,
+                            d.win_rate,
+                            d.diff_game
+                        ];
+                    })
+                    .join("td")
+                    .attr("class", "table-data")
+                    .text(function(d){return d;});
+
+                trs
+                    .on("mouseover", function(d) {
+                        highlightElementsByTeam(d.team);
+                    })
+                    .on("mouseout", function(d) {
+                        reverseHighlightElementsByTeam(d.team);
+                    });
+            });
+
+        trs
+            .selectAll("td")
+            .data(function(d){
+                // Order according to the demo
+                // manually ...
+                return [
+                    d.rank,
+                    d.team,
+                    //  d.games,
+                    d.W,
+                    d.D,
+                    d.L,
+                    d.win_rate,
+                    d.diff_game
+                ];
+            })
+            .join("td")
+            .attr("class", "table-data")
+            .text(function(d){return d;});
+
+        // Remove All teams no longer part of dataset
+        // as well as the corresponding event listeners;
+        trs
+            .on("mouseover", null)
+            .on("mouseout", null);
+        trs.exit().remove();
+
+        isTransitioning = false;
+    }
+
+    function initEventListeners(data) {
+        // Year
+        d3.select("#year").on("change", function() {
+            var year = d3.select(this).node().value;
+            var selectedRankings = getSelectedRankings(data, year);
+            var key = document.getElementById("win-rate-diff-game").value;
+            var uniqueTeams = getUniqueTeams(selectedRankings);
+
+            // Update charts and tables
+            updateTable.call(this, selectedRankings);
+            barChart.refresh(createBarChartData(selectedRankings, d3.select("#win-loss-draw").node().value));
+            lineChart.refresh(createLineChartData(data, 'year', key, uniqueTeams));
+            prevYear = year;
+        });
+
+        d3.select("#win-rate-diff-game").on("change", function() {
+            var key = document.getElementById("win-rate-diff-game").value;
+            var selectedRankings = getSelectedRankings(data, prevYear);
+            var uniqueTeams = getUniqueTeams(selectedRankings);
+            var lineChartData = createLineChartData(data, 'year', key, uniqueTeams);
+            lineChart.refresh(lineChartData);
+        });
+
+        // Third dropdown - Barchart update
+        d3.select("#win-loss-draw").on("change", function() {
+            var winLossDraw = d3.select(this).node().value;
+            var selectedRankings = getSelectedRankings(data, prevYear);
+            barChart.refresh(createBarChartData(selectedRankings, winLossDraw));
+        });
+    }
+
+    function createBarChartData(data, dataKey) {
+        return data.map(function(datum) {
+            return {
+                x: datum.team,
+                y: datum[dataKey]
+            }
+        });
+    }
+
+    function createLineChartData(data, x, y, teamMap) {
+        var teams = Object.keys(teamMap);
+        var timeParse = d3.timeParse("%Y");
+        var finalOutput = teams.map(function(team) {
+            var output = {};
+            output.category = team;
+            output.dataPoints = [];
+            return output;
+        });
+
+        data.forEach(function(datum) {
+            teams.forEach(function(team, index) {
+                var ranking = datum.rankings;
+                var target = ranking.filter(d => d.team === team);
+                var output = {};
+                output.x =  timeParse(datum[x]);
+                if (target.length > 0) {
+                    output.y = +target[0][y];
+                } else {
+                    output.y = NaN;
+                }
+                finalOutput[index].dataPoints.push(output)
+            });
+        });
+
+        return finalOutput;
+    }
+
+    /**
+     * Get the selected rankings for the given year
+     * */
+    function getSelectedRankings(data, year) {
+        for (var i = 0; i < data.length; i++) {
+            var currentData = data[i];
+            if (currentData.year === year) {
+                return currentData.rankings.sort(function(a, b) {
+                    return Number(a.rank) - Number(b.rank);
+                });
+            }
+        }
+    }
+
+    /**
+     * Get an object pertaining the corresponding color for each unique team.
+     * Key: team
+     * Value: color
+     * */
+    function getTeamColors(data) {
+        var teams = {};
+        var colorSchemes = [d3.scaleOrdinal(d3.schemeCategory10),
+            d3.scaleOrdinal(d3.schemeSet3)];
+        var teamCount = 0, paletteIndex = 0, paletteChanged = false;
+        data.forEach(function(datum) {
+            datum.rankings.forEach(function(ranking) {
+               if (!(ranking.team in teams)) {
+                   teams[ranking.team] = colorSchemes[paletteIndex](teamCount);
+                   teamCount++;
+               }
+               if (!paletteChanged && teamCount === 10) {
+                   paletteIndex++;
+                   paletteChanged = true;
+               }
+            });
+        });
+        return teams;
+    }
+
+    function highlightElementsByTeam(teamName) {
+        if (!isTransitioning) {
+            // Update Table row
+            d3.select(`.table-row[datakey=${teamName}]`).attr("class", "table-row transition-bar highlight-text");
+            // Update bar
+            d3.select(`.bar[datakey=${teamName}]`).attr("class", "bar highlighted-bar");
+            // Update Line
+            d3.select(`.line[datakey=${teamName}]`).attr("class", "line line-highlighted");
+        }
+    }
+
+    function reverseHighlightElementsByTeam(teamName) {
+        if (!isTransitioning) {
+            // Update Table row
+            d3.select(`.table-row[datakey=${teamName}]`).attr("class", "table-row transition-bar");
+            // Update bar
+            d3.select(`.bar[datakey=${teamName}]`).attr("class", "bar transition-bar");
+            // Update Line
+            d3.select(`.line[datakey=${teamName}]`).attr("class", "line");
+        }
+    }
+
+    /**
+     * Initialize the table.
+     * */
+    function initTable(data) {
+        var table = d3.select("#table-data")
+            .style("border-collapse", "collapse");
+        var rows = table
+            .append("tbody")
+            .selectAll("tr")
+            .data(data, d => d.team)
+            .enter()
+            .append('tr');
+
+        rows
+            .attr("class", "table-row transition-bar")
+            .attr("datakey", d => d.team)
+            .attr("style", (d, i) => `top: ${i * 46}px;`)
+            .on("mouseover", function(d) {
+                highlightElementsByTeam(d.team);
+            })
+            .on("mouseout", function(d) {
+                reverseHighlightElementsByTeam(d.team);
+            });
+
+        // For each row
+        rows.selectAll("td")
+            .data(function(d){
+                // Order according to the demo
+                // manually ...
+                return [
+                    d.rank,
+                    d.team,
+                  //  d.games,
+                    d.W,
+                    d.D,
+                    d.L,
+                    d.win_rate,
+                    d.diff_game
+                ];
+            })
+            .join("td")
+            .attr("class", "table-data")
+            .text(function(d){return d;})
+    }
+
+    function getUniqueTeams(selectedData) {
+        var output = {};
+        selectedData.forEach(function(row, index) {
+            return output[row.team] = index;
+        });
+        return output;
+    }
+
+    function initCharts(data, selectedData) {
+        var barChartData = createBarChartData(selectedData, 'W');
+        // Render barChart
+        barChart = d3Charts({
+            rootEl: "#barChart",
+            width: 500,
+            height: 450,
+            yAxis: {
+                scale: d3.scaleLinear()
+            },
+            xAxis: {
+                scale: d3.scaleBand()
+            },
+            chartElement: {
+                attrs: {
+                    fill: function(d) {
+                        return teamColors[d.x]
+                    },
+                    'datakey': function(d) {
+                        return d.x;
+                    }
+                },
+            },
+            margins: {
+                left: 30,
+                right: 30,
+                bottom: 30,
+                top: 30
+            }
+        }).barChart(barChartData);
+
+        // Generate Line chart Data
+        var uniqueTeams = getUniqueTeams(selectedData);
+        var key = document.getElementById("win-rate-diff-game").value;
+        var lineChartData = createLineChartData(data, 'year', key, uniqueTeams);
+
+        // initialize chart
+        lineChart = d3Charts({
+            rootEl: "#lineChart",
+            width: 500,
+            height: 450,
+            yAxis: {
+                min: 0,
+                scale: d3.scaleLinear()
+            },
+            xAxis: {
+                scale: d3.scaleTime()
+            },
+            chartElement: {
+                attrs: {
+                    stroke: function(d) {
+                        return teamColors[d.category];
+                    },
+                    'datakey': function(d) {
+                        return d.category;
+                    }
+                },
+            },
+            margins: {
+                left: 30,
+                right: 30,
+                bottom: 30,
+                top: 30
+            }
+        }).lineChart(lineChartData);
+    }
+    /**
+     * Initialize all of the D3 elements and components
+     * required for generating components shown in demo video
+     * */
+    function initComponents(data) {
+        teamColors = getTeamColors(data);
+        initializeComboBoxes(data);
+        var yearComboBox = document.getElementById("year");
+        var selectedData = getSelectedRankings(data, yearComboBox.value);
+        initTable(selectedData);
+        initCharts(data, selectedData);
+        initEventListeners(data);
+    }
+    // Load data and page components
+    d3.json("data.json").then(initComponents);
+</script>

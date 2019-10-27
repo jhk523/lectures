@@ -49,14 +49,6 @@
     }
 
     function updateTable(currentData, init){
-        if (! init){
-            d3.selectAll('.content-list')
-                .selectAll('text')
-                .transition()
-                .duration(500)
-                .style('opacity', '0')
-                .remove();
-        }
         let tableContents = d3.select('#table')
                             .append('g')
                             .attr('transform', translate(margin.left, margin.top))
@@ -89,7 +81,17 @@
                                     return translate(tableRectWidth * i, 0)
                                 });;
 
-        // rect                        
+        // rect    
+        if (! init){
+            d3.selectAll('.content-list')
+                .selectAll('text')
+                .data(currentData)
+                .exit()
+                .transition()
+                .duration(500)
+                .style('opacity', '0')
+                .remove();
+        }            
         let tableRect = tableData                        
                                 .append('rect')
                                 .attr('width', tableRectWidth)
@@ -121,8 +123,7 @@
 
     d3.json('data.json').then(function(data){
         let uniqueTeam = [];
-        let colorTeam = [];
-        let years = []
+        let colorTeam = new Object();
 
         data.forEach(function(d){
             d.rankings.forEach(function(d2){
@@ -135,12 +136,12 @@
                 d2.win_rate = parseFloat(d2.win_rate);
                 uniqueTeam.push(d2.team);
             })
-            d.year = parseFloat(d.year)
-            years.push(d.year)
         })
 
         uniqueTeam = [... new Set(uniqueTeam)];
-        for(let i=0; i<uniqueTeam.length; i++){colorTeam.push('#'+Math.floor(Math.random()*16777215).toString(16)) }
+        for(let i=0; i<uniqueTeam.length; i++){
+            colorTeam[uniqueTeam[i]] = '#'+Math.floor(Math.random()*16777215).toString(16);
+        }
 
         let year_selection = d3.select('.years')
                                 .selectAll('option')
@@ -149,7 +150,7 @@
                                     .text(k => k.year)
                                     .attr('id', k=> k.year)
 
-        let currentData = getSelectedData(data, 1982);
+        let currentData = getSelectedData(data, '1982');
 
         let table = d3.select('#plot')
                         .append('svg')
@@ -175,83 +176,221 @@
                             })
 
         // line chart
-        let chartData = [];
-        for(let i=0; i<uniqueTeam.length;i++){
-            let temp = {'team': uniqueTeam[i], 'value': []};
-            chartData.push(temp);
-        }
+        let lineChartSVG = d3.select('#plot')
+                                .append('svg')
+                                .attr('id', 'chart')
+                                .attr('width', svgWidth)
+                                .attr('height', svgHeight)
+                                .attr('transform', translate(margin.left, margin.top));
+                                
+        function updateLineChart(selected, selected2, is_change, init){
+            let currentData = getSelectedData(data, selected);
 
-        for(let i=0; i<data.length;i++){
-            for(let j=0; j<data[i].rankings.length;j++){
-                for(let k=0; k<chartData.length; k++){
-                    if (chartData[k].team === data[i].rankings[j].team){
-                        let tempDict = {'year': data[i].year, 
-                                        'win_rate': data[i].rankings[j].win_rate}
-                        chartData[k].value.push(tempDict)
+            let currentTeam = [];
+
+            for(let i=0; i<currentData['rankings'].length; i++){
+                currentTeam.push(currentData['rankings'][i].team)
+            }
+
+            let chartData = [];
+
+            for(let i=0; i<currentTeam.length;i++){
+                let temp = {'team': currentTeam[i], 'value': []};
+                chartData.push(temp);    
+            }
+
+            for(let i=0; i<data.length;i++){
+                for(let j=0; j<data[i].rankings.length;j++){
+                    for(let k=0; k<chartData.length; k++){
+                        if (chartData[k].team === data[i].rankings[j].team){
+                            let tempDict = {'year': data[i].year, 
+                                            'win_rate': data[i].rankings[j].win_rate,
+                                            'diff_game': data[i].rankings[j].diff_game}
+                            chartData[k].value.push(tempDict)
+                        }
                     }
                 }
             }
+            if(selected2 == 'WR'){
+                let chartWinRateX = d3.scaleLinear()
+                            .domain([
+                                d3.min(chartData, d=> {
+                                    return d3.min(d.value, datum => {
+                                        return datum.year;
+                                    })
+                                }),
+                                d3.max(chartData, d=> {
+                                    return d3.max(d.value, datum => {
+                                        return datum.year;
+                                    })
+                                })
+                            ])
+                            .range([40, width])
+
+                let chartWinRateY = d3.scaleLinear()
+                            .domain([
+                                d3.min(chartData, d => {
+                                    return d3.min(d.value, datum => {
+                                        return datum.win_rate;
+                                    })
+                                }),
+                                d3.max(chartData, d => {
+                                    return d3.max(d.value, datum => {
+                                        return datum.win_rate;
+                                    })
+                                })
+                            ])
+                            .range([height, 0])
+
+                let lineD = d3.line()
+                                .x(d => {return chartWinRateX(parseFloat(d.year))})
+                                .y(d => {return chartWinRateY(d.win_rate)})
+
+                let lineChart = d3.select('#chart');
+
+                if(init){
+                    let lines = lineChart.selectAll('path')
+                        .data(chartData)
+                        .enter()
+                        .append('path')
+                            .attr('class', d => 'chart-info ' + d.team)
+                            .attr('d', d => lineD(d.value))
+                            .attr('fill', 'none')
+                            .attr('stroke', d => colorTeam[d.team])
+                            .attr('stroke-width', '1.5')
+                } 
+                else{
+                    d3.selectAll('.chartAxis')
+                    .remove();
+                    
+                    d3.selectAll('.chart-info')
+                        .data(chartData, d=> d.team)
+                        .exit()
+                        .remove();
+                    console.log(chartData)
+
+                    lineChart.selectAll('.chart-info')
+                            .data(chartData, d => d.team)
+                            .enter()
+                            .append('path')
+                                .attr('class', d => 'chart-info ' + d.team)
+                                .attr('d', d => lineD(d.value))
+                                .attr('fill', 'none')
+                                .attr('stroke', d => colorTeam[d.team])
+                                .attr('stroke-width', '1.5')
+                                .attr('opacity', 0)
+                                .transition()
+                                .duration(500)
+                                .attr('opacity', 1)
+                }
+                if(is_change){
+                    lineChart.selectAll('.chart-info')
+                            .transition().duration(500)
+                            .attr('d', d => lineD(d.value))
+                            .attr('fill', 'none')
+                            .attr('stroke', d => colorTeam[d.team])
+                            .attr('stroke-width', '1.5')
+                }
+                lineChart.append('g')
+                            .call(d3.axisBottom(chartWinRateX))
+                            .attr('class', 'chartAxis')
+                            .attr('transform', translate(0, height))
+
+                lineChart.append('g')
+                            .call(d3.axisLeft(chartWinRateY))
+                            .attr('class', 'chartAxis')
+                            .attr('transform', translate(40, 0)) 
+                }
+            else if (selected2 == 'DG'){
+                let chartDiffGameX = d3.scaleLinear()
+                            .domain([
+                                d3.min(chartData, d=> {
+                                    return d3.min(d.value, datum => {
+                                        return datum.year;
+                                    })
+                                }),
+                                d3.max(chartData, d=> {
+                                    return d3.max(d.value, datum => {
+                                        return datum.year;
+                                    })
+                                })
+                            ])
+                            .range([40, width])
+
+                let chartDiffGameY = d3.scaleLinear()
+                            .domain([
+                                d3.max(chartData, d => {
+                                    return d3.max(d.value, datum => {
+                                        return datum.diff_game;
+                                    })
+                                }),
+                                d3.min(chartData, d => {
+                                    return d3.min(d.value, datum => {
+                                        return datum.diff_game;
+                                    })
+                                })
+                                
+                            ])
+                            .range([height, 0])
+
+                let lineD = d3.line()
+                                .x(d => {return chartDiffGameX(parseFloat(d.year))})
+                                .y(d => {return chartDiffGameY(d.diff_game)})
+
+                let lineChart = d3.select('#chart');
+                                
+                lineChart
+                    .selectAll('.chart-info')
+                    .data(chartData, d => d.team)
+                    .exit()
+                    .remove();
+
+                d3.selectAll('.chartAxis')
+                    .remove();
+
+                if(is_change){
+                    lineChart.selectAll('.chart-info')
+                            .transition().duration(500)
+                            .attr('d', d => lineD(d.value))
+                            .attr('fill', 'none')
+                            .attr('stroke', d => colorTeam[d.team])
+                            .attr('stroke-width', '1.5')
+                }
+                lineChart.append('g')
+                            .call(d3.axisBottom(chartDiffGameX))
+                            .attr('class', 'chartAxis')
+                            .attr('transform', translate(0, height))
+
+                lineChart.append('g')
+                            .call(d3.axisLeft(chartDiffGameY))
+                            .attr('class', 'chartAxis')
+                            .attr('transform', translate(40, 0)) 
+            }
+            
         }
-
-        let lineChart = d3.select('#plot')
-                            .append('svg');
-        lineChart.attr('id', 'chart')
-                    .attr('width', svgWidth)
-                    .attr('height', svgHeight)
-                            
-        var chartX = d3.scaleLinear()
-                    .domain([
-                        d3.min(years),
-                        d3.max(years)
-                    ])
-                    .range([0, width])
-
-        var chartY = d3.scaleLinear()
-                        .domain([
-                            d3.min(chartData, d => {
-                                return d3.min(d.value, datum => {
-                                    return datum.win_rate;
-                                })
-                            }),
-                            d3.max(chartData, d => {
-                                return d3.max(d.value, datum => {
-                                    return datum.win_rate;
-                                })
-                            })
-                        ])
-
-        lineChart.append('g')
-                    .call(chartX)
-        lineChart.append('g')
-                    .call(chartY)
-
-        let line = d3.line()
-                        .x(d => chartX(d.year))
-                        .y(d => chartY(d.win_rate))
-
-
-        console.log(lineChart);
-
-        // var chartY = d3.scaleLinear()
-        //             .domain([
-        //                 d3.min(years),
-        //                 d3.max(years)
-        //             ])
-
-                 
+        
 
         // histogram
 
 
         // run
         updateTable(currentData, true);
+        updateLineChart('1982', 'WR', false, true);
 
         d3.select('.years')
             .on("change", function(d){
-                let selected = parseFloat(d3.select('.years').node().value);
+                let selected = d3.select('.years').node().value;
+                let selected2 = d3.select('.win_diff').node().value;
                 currentData = getSelectedData(data, selected);
                 updateTable(currentData, false);
-                ;
+                updateLineChart(selected, selected2, false, false);
+            })
+
+        d3.select('.win_diff')
+            .on('change', function(d){
+                let selected = d3.select('.years').node().value;
+                let selected2 = d3.select('.win_diff').node().value;
+                updateLineChart(selected, selected2, true, false);
             })
         
 
