@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Assignment 2</title>
+    <title>Assignment 2 - Jung hoon</title>
     <script src="https://d3js.org/d3.v5.js"></script>
     <style>
         select{display: block;}
@@ -35,8 +35,9 @@
     </script>
 
     <script>
-    function translate(plotX, plotY){
-        return 'translate(' + plotX + ', ' + plotY + ')';
+    // Common functions
+    function translate(X, Y){
+        return 'translate(' + X + ', ' + Y + ')';
     }   
 
     function getSelectedData(data, year) {
@@ -48,16 +49,31 @@
         }
     }
 
-    function appendRect(table, height){
-        table.append('rect')
-            .attr('width', tableRectWidth)
-            .attr('height', tableRectHeight)
-            .attr('fill', 'none')
-            .attr('transform', (d, i) =>{
-                return translate(tableRectWidth * i, height)
-            }) 
-    }
+    // SVG
+    let table = d3.select('#plot')
+            .append('svg')
+            .attr('id', 'table')
+            .attr('width', svgWidth)
+            .attr('height', svgHeight)
+                    
+    let lineSVG = d3.select('#plot')
+                    .append('svg')
+                    .attr('id', 'line')
+                    .attr('width', svgWidth)
+                    .attr('height', svgHeight)
+                    .attr('transform', translate(margin.left, margin.top));
+    
+    let barSVG = d3.select('#plot')
+                    .append('svg')
+                    .attr('id', 'bar')
+                    .attr('width', svgWidth)
+                    .attr('height', svgHeight)
+                    .attr('transform', translate(margin.left, margin.top))
+                    .append('g')
+                        .attr('transform', translate(margin.left, margin.top));
 
+    // Update functions
+    // Table
     function updateTable(data, year, init){
         let currentData = getSelectedData(data, year);
 
@@ -73,7 +89,6 @@
                             .attr('transform', (d, i) =>{
                                 return translate(0, tableRectHeight * (i+2))
                             }) 
-        // g
         let tableData = d3.selectAll('.content-list')
                                 .selectAll('g')
                                 .data(d => {
@@ -93,7 +108,6 @@
                                     return translate(tableRectWidth * i, 0)
                                 });;
 
-        // rect    
         if (! init){
             d3.selectAll('.content-list')
                 .selectAll('text')
@@ -125,18 +139,13 @@
         }
     }
 
-
-    // Line Chart
-    function updateLineChart(data, year, win_diff, colorTeam, is_change, init){
-        let currentData = getSelectedData(data, year);
-
+    function preprocessData(data, currentData){
         let currentTeam = [];
+        let chartData = [];
 
         for(let i=0; i<currentData['rankings'].length; i++){
             currentTeam.push(currentData['rankings'][i].team)
         }
-
-        let chartData = [];
 
         for(let i=0; i<currentTeam.length;i++){
             let temp = {'team': currentTeam[i], 'value': []};
@@ -149,12 +158,25 @@
                     if (chartData[k].team === data[i].rankings[j].team){
                         let tempDict = {'year': data[i].year, 
                                         'win_rate': data[i].rankings[j].win_rate,
-                                        'diff_game': data[i].rankings[j].diff_game}
+                                        'diff_game': data[i].rankings[j].diff_game,
+                                        'W': data[i].rankings[j].W,
+                                        'D': data[i].rankings[j].D,
+                                        'L': data[i].rankings[j].L}
                         chartData[k].value.push(tempDict)
                     }
                 }
             }
         }
+        return [currentTeam, chartData];
+    }
+
+    // Line Chart
+    function updateLine(data, year, win_diff, colorTeam, is_change, init){
+        let currentData = getSelectedData(data, year);
+        let tempData = preprocessData(data, currentData)
+        currentTeam = tempData[0]
+        chartData = tempData[1]
+
         if(win_diff == 'WR'){
             let chartWinRateX = d3.scaleLinear()
                         .domain([
@@ -190,7 +212,7 @@
                             .x(d => {return chartWinRateX(parseFloat(d.year))})
                             .y(d => {return chartWinRateY(d.win_rate)})
 
-            let lineChart = d3.select('#chart');
+            let lineChart = d3.select('#line');
 
             if(init){
                 let lines = lineChart.selectAll('path')
@@ -211,7 +233,6 @@
                     .data(chartData, d=> d.team)
                     .exit()
                     .remove();
-                console.log(chartData)
 
                 lineChart.selectAll('.chart-info')
                         .data(chartData, d => d.team)
@@ -281,7 +302,7 @@
                             .x(d => {return chartDiffGameX(parseFloat(d.year))})
                             .y(d => {return chartDiffGameY(d.diff_game)})
 
-            let lineChart = d3.select('#chart');
+            let lineChart = d3.select('#line');
                             
             lineChart
                 .selectAll('.chart-info')
@@ -300,6 +321,27 @@
                         .attr('stroke', d => colorTeam[d.team])
                         .attr('stroke-width', '1.5')
             }
+            else{
+                d3.selectAll('.chart-info')
+                    .data(chartData, d=> d.team)
+                    .exit()
+                    .remove();
+
+                lineChart.selectAll('.chart-info')
+                        .data(chartData, d => d.team)
+                        .enter()
+                        .append('path')
+                            .attr('class', d => 'chart-info ' + d.team)
+                            .attr('d', d => lineD(d.value))
+                            .attr('fill', 'none')
+                            .attr('stroke', d => colorTeam[d.team])
+                            .attr('stroke-width', '1.5')
+                            .attr('opacity', 0)
+                            .transition()
+                            .duration(500)
+                            .attr('opacity', 1)
+            }
+
             lineChart.append('g')
                         .call(d3.axisBottom(chartDiffGameX))
                         .attr('class', 'chartAxis')
@@ -310,6 +352,75 @@
                         .attr('class', 'chartAxis')
                         .attr('transform', translate(40, 0)) 
         }
+    }
+
+    // Bar chart
+    function updateBar(data, year, WDL, colorTeam, clickChange){
+        let currentData = getSelectedData(data, year);
+        let tempData = preprocessData(data, currentData)
+        let currentTeam = tempData[0]
+        let chartData = tempData[1]
+
+        let barX = d3.scaleBand()
+                        .domain(currentTeam)
+                        .rangeRound([0, width]);
+                        
+        let barY = d3.scaleLinear()
+                        .domain([
+                            0,
+                            d3.max(currentData.rankings, d => {
+                                if (WDL === 'W'){return d.W;}
+                                else if (WDL === 'D') {return d.D}
+                                else {return d.L}
+                                })
+                        ])
+                        .range([height, 0]);
+        
+        let barXAxis = d3.axisBottom(barX);
+        let barYAxis = d3.axisLeft(barY);
+
+        d3.selectAll('.barAxis').remove();
+
+        barSVG.append('g')
+            .attr('transform', translate(0, height))
+            .attr('class', 'barAxis')
+            .call(barXAxis)
+        barSVG.append('g')
+            .attr('transform', translate(0,0))
+            .attr('class', 'barAxis')
+            .call(barYAxis)
+
+        let bar = barSVG.selectAll('rect')
+                    .data(currentData.rankings, d => d.team)
+
+        if(clickChange){
+            bar.transition()
+                .duration(500)
+                .attr('x', d => barX(d.team))
+                .attr('y', d => {if(WDL === 'W'){return barY(d.W);}
+                                    else if(WDL === 'D'){return barY(d.D);}
+                                    else{return barY(d.L);}})
+                .attr('width', barX.bandwidth())
+                .attr('height', d => {if(WDL === 'W'){return height - barY(d.W);}
+                                    else if(WDL === 'D'){return height - barY(d.D);}
+                                    else{return height - barY(d.L);}})
+                .style('fill', d => colorTeam[d.team])
+        }
+        else{
+            bar.enter()
+            .append('rect')
+            .merge(bar)
+            .attr('x', d => barX(d.team))
+            .attr('y', d => {if(WDL === 'W'){return barY(d.W);}
+                                else if(WDL === 'D'){return barY(d.D);}
+                                else{return barY(d.L);}})
+            .attr('width', barX.bandwidth())
+            .attr('height', d => {if(WDL === 'W'){return height - barY(d.W);}
+                                else if(WDL === 'D'){return height - barY(d.D);}
+                                else{return height - barY(d.L);}})
+            .style('fill', d => colorTeam[d.team])
+        }
+                
     }
 
     d3.json('data.json').then(function(data){
@@ -342,12 +453,6 @@
                                     .attr('id', k=> k.year)
 
         let currentData = getSelectedData(data, '1982');
-
-        let table = d3.select('#plot')
-                        .append('svg')
-                        .attr('id', 'table')
-                        .attr('width', svgWidth)
-                        .attr('height', svgHeight)
         
         let tableTitle = table.append('g')
                         .attr('class', 'title-group')
@@ -358,45 +463,49 @@
                         .attr('class', 'title')
                         .attr('transform', translate(margin.left, margin.top))
 
-        let tableTitleRect = appendRect(tableTitle, 0)
+        let tableTitleRect = tableTitle.append('rect')
+            .attr('width', tableRectWidth)
+            .attr('height', tableRectHeight)
+            .attr('fill', 'none')
+            .attr('transform', (d, i) =>{
+                return translate(tableRectWidth * i, height)
+            }) 
 
         let tableTitleTexts = tableTitle.append('text')
                             .text(x => x)
                             .attr('transform', (d, i) => {
                                 return translate(tableRectWidth * i, tableRectHeight)      
-                            })
-
-        // line chart
-        let lineChartSVG = d3.select('#plot')
-                                .append('svg')
-                                .attr('id', 'chart')
-                                .attr('width', svgWidth)
-                                .attr('height', svgHeight)
-                                .attr('transform', translate(margin.left, margin.top));
-                                
-        
-        
-        // histogram
+                            })                          
 
 
         // run
-        updateTable(data, '1982', true);
-        updateLineChart(data, '1982', 'WR', colorTeam, false, true);
+        updateTable(data, '1982', init=true);
+        updateLine(data, '1982', 'WR', colorTeam, 
+                        is_change=false, init=true);
+        updateBar(data, '1982', WDL='W', colorTeam, clickChange=false);
 
         d3.select('.years')
             .on("change", function(d){
                 let year = d3.select('.years').node().value;
                 let win_diff = d3.select('.win_diff').node().value;
                 currentData = getSelectedData(data, year);
-                updateTable(data, year, false);
-                updateLineChart(data, year, win_diff, colorTeam, false, false);
+                updateTable(data, year, init=false);
+                updateLine(data, year, win_diff, colorTeam, 
+                                is_change=false, init=false);
             })
 
         d3.select('.win_diff')
             .on('change', function(d){
                 let year = d3.select('.years').node().value;
                 let win_diff = d3.select('.win_diff').node().value;
-                updateLineChart(data, year, win_diff, colorTeam, true, false);
+                updateLine(data, year, win_diff, colorTeam, 
+                                is_change=true, init=false);
+            })
+        d3.select('.WDL')
+            .on('change', function(d){
+                let year = d3.select('.years').node().value;
+                let wdl = d3.select('.WDL').node().value;
+                updateBar(data, year, WDL=wdl, colorTeam, clickChange=true)
             })
     })
     </script>

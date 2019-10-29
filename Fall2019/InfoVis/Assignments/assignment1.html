@@ -173,9 +173,9 @@
                     .range([height, 0]);
         
         let barX = d3.scaleBand()
-            .domain(letters)
-            .rangeRound([0, width])
-            .padding(0.1);
+                    .domain(letters)
+                    .rangeRound([0, width])
+                    .padding(0.1);
         let barY = d3.scaleLinear()
                     .domain([
                         d3.min(barData, d => 0),
