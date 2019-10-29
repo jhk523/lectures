@@ -44,9 +44,43 @@
         for (var i = 0; i < data.length; i++) {
             var currentData = data[i];
             if (currentData.year === year) {
+                let rankings = currentData.rankings;
+                for (let j=0; j<rankings.length; j++){
+                    delete rankings[j].games
+                }
                 return currentData;
             } 
         }
+    }
+    function preprocessData(data, currentData){
+        let currentTeam = [];
+        let chartData = [];
+
+        for(let i=0; i<currentData['rankings'].length; i++){
+            currentTeam.push(currentData['rankings'][i].team)
+        }
+
+        for(let i=0; i<currentTeam.length;i++){
+            let temp = {'team': currentTeam[i], 'value': []};
+            chartData.push(temp);    
+        }
+
+        for(let i=0; i<data.length;i++){
+            for(let j=0; j<data[i].rankings.length;j++){
+                for(let k=0; k<chartData.length; k++){
+                    if (chartData[k].team === data[i].rankings[j].team){
+                        let tempDict = {'year': data[i].year, 
+                                        'win_rate': data[i].rankings[j].win_rate,
+                                        'diff_game': data[i].rankings[j].diff_game,
+                                        'W': data[i].rankings[j].W,
+                                        'D': data[i].rankings[j].D,
+                                        'L': data[i].rankings[j].L}
+                        chartData[k].value.push(tempDict)
+                    }
+                }
+            }
+        }
+        return [currentTeam, chartData];
     }
 
     // SVG
@@ -77,97 +111,124 @@
     function updateTable(data, year, init){
         let currentData = getSelectedData(data, year);
 
-        let tableContents = d3.select('#table')
-                            .append('g')
-                            .attr('transform', translate(margin.left, margin.top))
-                            .attr('class', 'content-group')
-                            .selectAll('g')
-                            .data(currentData.rankings)
+        if(init){
+            let tableTitle = table.append('g')
+                            .attr('class', 'title-group')
+                            .selectAll('text')
+                            .data(['rank','team','W','D','L','win_rate','diff_game'])
                             .enter()
                             .append('g')
-                            .attr('class', 'content-list')
-                            .attr('transform', (d, i) =>{
-                                return translate(0, tableRectHeight * (i+2))
-                            }) 
-        let tableData = d3.selectAll('.content-list')
-                                .selectAll('g')
-                                .data(d => {
-                                    return [
-                                        d.rank,
-                                        d.team,
-                                        d.W,
-                                        d.D,
-                                        d.L,
-                                        d.win_rate,
-                                        d.diff_game
-                                    ];
-                                })
-                                .enter()
-                                .append('g')
-                                .attr('transform', (d, i) =>{
-                                    return translate(tableRectWidth * i, 0)
-                                });;
+                            .attr('class', 'title')
+                            .attr('transform', translate(margin.left, margin.top))
 
-        if (! init){
-            d3.selectAll('.content-list')
-                .selectAll('text')
-                .data(currentData)
+            let tableTitleRect = tableTitle.append('rect')
+                .attr('width', tableRectWidth)
+                .attr('height', tableRectHeight)
+                .attr('fill', 'none')
+                .attr('transform', (d, i) =>{
+                    return translate(tableRectWidth * i, height)
+                }) 
+
+            let tableTitleTexts = tableTitle.append('text')
+                                .text(x => x)
+                                .attr('transform', (d, i) => {
+                                    return translate(tableRectWidth * i, tableRectHeight)      
+                                })    
+            d3.select('#table')
+                .append('g')
+                .attr('transform', translate(margin.left, margin.top))
+                .attr('class', 'content-group')
+        }
+
+        d3.selectAll('.table-info')
+                .data(currentData.rankings, d => d.team)
                 .exit()
-                .transition()
-                .duration(500)
-                .style('opacity', '0')
-                .remove();
-        }            
-        let tableRect = tableData                        
-                                .append('rect')
-                                .attr('width', tableRectWidth)
-                                .attr('height', tableRectHeight)
-                                .attr('fill', 'none')
-                                                                        
-        if(!init){
-            let tableText = tableData.append('text')
-                                    .text(x => x)
-                                    .attr('opacity', 0)
-                                    .transition()
-                                    .delay(500)
-                                    .duration(500)
-                                    .attr('opacity', 1)
-        }
-        else{
-            let tableText = tableData.append('text')
-                                    .text(x => x)
-        }
-    }
+                .remove()
 
-    function preprocessData(data, currentData){
-        let currentTeam = [];
-        let chartData = [];
+        let tableContents = d3.select('#table')
+                                .select('.content-group')
+                                .selectAll('g')
+                                .data(currentData.rankings, d => d.team)
 
-        for(let i=0; i<currentData['rankings'].length; i++){
-            currentTeam.push(currentData['rankings'][i].team)
-        }
+        let tableTeams = tableContents.enter()
+                                        .append('g')
+                                        .attr('class', d => 'table-info ' + d.team)
+                                        .attr('transform', (d, i) =>{
+                                            return translate(0, tableRectHeight * (i+2))
+                                        })
 
-        for(let i=0; i<currentTeam.length;i++){
-            let temp = {'team': currentTeam[i], 'value': []};
-            chartData.push(temp);    
-        }
+        console.log(currentData)
+        let tableData = d3.selectAll('.table-info')
+                            .selectAll('text')
+                            .data(currentData.rankings)
+                            .enter().append('text')
 
-        for(let i=0; i<data.length;i++){
-            for(let j=0; j<data[i].rankings.length;j++){
-                for(let k=0; k<chartData.length; k++){
-                    if (chartData[k].team === data[i].rankings[j].team){
-                        let tempDict = {'year': data[i].year, 
-                                        'win_rate': data[i].rankings[j].win_rate,
-                                        'diff_game': data[i].rankings[j].diff_game,
-                                        'W': data[i].rankings[j].W,
-                                        'D': data[i].rankings[j].D,
-                                        'L': data[i].rankings[j].L}
-                        chartData[k].value.push(tempDict)
-                    }
-                }
-            }
-        }
-        return [currentTeam, chartData];
+        // if(!init){
+        //     tableData.enter()
+        //             .append('text')
+        //             .text(x => x)
+        //             .attr('transform', (d, i) =>{
+        //         return translate(tableRectWidth * i, 0)})
+        // }
+        // else{ 
+        //     let tableText = tableData.enter().append('text')
+        //                             .text(x => x)
+        //                             .attr('transform', (d, i) =>{
+        //                         return translate(tableRectWidth * i, 0)})
+        // }
+
+        // let tableData = d3.selectAll('.table-info')
+        //                     .selectAll('g')
+        //                     .data(d => {
+        //                         return [
+        //                             d.rank,
+        //                             d.team,
+        //                             d.W,
+        //                             d.D,
+        //                             d.L,
+        //                             d.win_rate,
+        //                             d.diff_game
+        //                         ];
+        //                     })           
+                             
+        // d3.selectAll('.table-info').selectAll('text')
+        //   .data(currentData.rankings, d => {
+        //                         return [
+        //                             d.rank,
+        //                             d.team,
+        //                             d.W,
+        //                             d.D,
+        //                             d.L,
+        //                             d.win_rate,
+        //                             d.diff_game
+        //                         ];
+        //                     })  
+        //     .exit().remove();
+
+        // if(!init){
+        //     tableData.enter()
+        //             .append('text')
+        //             .text(x => x)
+        //             .attr('transform', (d, i) =>{
+        //         return translate(tableRectWidth * i, 0)})
+        // }
+        // else{ 
+        //     let tableText = tableData.enter().append('text')
+        //                             .text(x => x)
+        //                             .attr('transform', (d, i) =>{
+        //                         return translate(tableRectWidth * i, 0)})
+        // }
+
+        // // if (! init){
+        // //     d3.selectAll('.content-list')
+        // //         .selectAll('text')
+        // //         .data(currentData)
+        // //         .exit()
+        // //         .transition()
+        // //         .duration(500)
+        // //         .style('opacity', '0')
+        // //         .remove();
+        // // }     
     }
 
     // Line Chart
@@ -363,7 +424,8 @@
 
         let barX = d3.scaleBand()
                         .domain(currentTeam)
-                        .rangeRound([0, width]);
+                        .rangeRound([0, width])
+                        .padding(0.05);
                         
         let barY = d3.scaleLinear()
                         .domain([
@@ -394,6 +456,8 @@
                     .data(currentData.rankings, d => d.team)
 
         if(clickChange){
+            bar.exit().remove();
+
             bar.transition()
                 .duration(500)
                 .attr('x', d => barX(d.team))
@@ -405,6 +469,24 @@
                                     else if(WDL === 'D'){return height - barY(d.D);}
                                     else{return height - barY(d.L);}})
                 .style('fill', d => colorTeam[d.team])
+
+            bar.enter()
+                .append('rect')
+                .style('opacity', 0.0)
+                .attr('x', d => barX(d.team))
+                .attr('y', d => {if(WDL === 'W'){return barY(d.W);}
+                                    else if(WDL === 'D'){return barY(d.D);}
+                                    else{return barY(d.L);}})
+                .attr('width', barX.bandwidth())
+                .attr('height', d => {if(WDL === 'W'){return height - barY(d.W);}
+                                    else if(WDL === 'D'){return height - barY(d.D);}
+                                    else{return height - barY(d.L);}})
+                .attr('class', d => 'bar-info ' + d.team)
+                .style('fill', d => colorTeam[d.team])
+                .transition()
+                .delay(500)
+                .duration(1000)
+                .style('opacity', 1.0)
         }
         else{
             bar.enter()
@@ -418,6 +500,7 @@
             .attr('height', d => {if(WDL === 'W'){return height - barY(d.W);}
                                 else if(WDL === 'D'){return height - barY(d.D);}
                                 else{return height - barY(d.L);}})
+            .attr('class', d => 'bar-info ' + d.team)
             .style('fill', d => colorTeam[d.team])
         }
                 
@@ -452,32 +535,6 @@
                                     .text(k => k.year)
                                     .attr('id', k=> k.year)
 
-        let currentData = getSelectedData(data, '1982');
-        
-        let tableTitle = table.append('g')
-                        .attr('class', 'title-group')
-                        .selectAll('text')
-                        .data(['rank','team','W','D','L','win_rate','diff_game'])
-                        .enter()
-                        .append('g')
-                        .attr('class', 'title')
-                        .attr('transform', translate(margin.left, margin.top))
-
-        let tableTitleRect = tableTitle.append('rect')
-            .attr('width', tableRectWidth)
-            .attr('height', tableRectHeight)
-            .attr('fill', 'none')
-            .attr('transform', (d, i) =>{
-                return translate(tableRectWidth * i, height)
-            }) 
-
-        let tableTitleTexts = tableTitle.append('text')
-                            .text(x => x)
-                            .attr('transform', (d, i) => {
-                                return translate(tableRectWidth * i, tableRectHeight)      
-                            })                          
-
-
         // run
         updateTable(data, '1982', init=true);
         updateLine(data, '1982', 'WR', colorTeam, 
@@ -488,10 +545,12 @@
             .on("change", function(d){
                 let year = d3.select('.years').node().value;
                 let win_diff = d3.select('.win_diff').node().value;
-                currentData = getSelectedData(data, year);
+                let wdl = d3.select('.WDL').node().value;
+
                 updateTable(data, year, init=false);
                 updateLine(data, year, win_diff, colorTeam, 
                                 is_change=false, init=false);
+                updateBar(data, year, WDL=wdl, colorTeam, clickChange=true)
             })
 
         d3.select('.win_diff')
@@ -501,11 +560,35 @@
                 updateLine(data, year, win_diff, colorTeam, 
                                 is_change=true, init=false);
             })
+
         d3.select('.WDL')
             .on('change', function(d){
                 let year = d3.select('.years').node().value;
                 let wdl = d3.select('.WDL').node().value;
                 updateBar(data, year, WDL=wdl, colorTeam, clickChange=true)
+            })
+
+        d3.selectAll('.bar-info, .chart-info, .table-info')
+            .on('mouseenter', function(){
+                let teamName = this.getAttribute('class').split(' ')[1]
+                d3.selectAll('.' + teamName)
+                    .style('stroke-width', '3')
+                    .style('font-weight', 'bold')
+
+                d3.select('#bar')
+                    .selectAll('.' + teamName)
+                    .style('stroke-width', '3')
+                    .style('stroke', 'rgb(0,0,0)')
+            })
+            .on('mouseleave', function(){
+                let teamName = this.getAttribute('class').split(' ')[1]
+                d3.selectAll('.' + teamName)
+                    .style('stroke-width', 1.5)
+                    .style('font-weight', 'normal')
+                    
+                d3.select('#bar')
+                    .selectAll('.' + teamName)
+                    .style('stroke-width', '0')
             })
     })
     </script>
