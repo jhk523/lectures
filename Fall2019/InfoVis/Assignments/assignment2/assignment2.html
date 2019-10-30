@@ -156,79 +156,62 @@
                                         .attr('transform', (d, i) =>{
                                             return translate(0, tableRectHeight * (i+2))
                                         })
+        tableTeams.selectAll('text')
+                    .data(d => {
+                                return [
+                                    d.rank,
+                                    d.team,
+                                    d.W,
+                                    d.D,
+                                    d.L,
+                                    d.win_rate,
+                                    d.diff_game
+                                ];
+                            })
+                    .enter()
+                    .append('text')
+                    .attr('transform', (d, i) =>{
+                                return translate(tableRectWidth * i, 0)})  
 
-        console.log(currentData)
         let tableData = d3.selectAll('.table-info')
-                            .selectAll('text')
-                            .data(currentData.rankings)
-                            .enter().append('text')
+                            .selectAll('g')
+                            .data(d => {
+                                return [
+                                    d.rank,
+                                    d.team,
+                                    d.W,
+                                    d.D,
+                                    d.L,
+                                    d.win_rate,
+                                    d.diff_game
+                                ];
+                            }, x => x.team)    
 
-        // if(!init){
-        //     tableData.enter()
-        //             .append('text')
-        //             .text(x => x)
-        //             .attr('transform', (d, i) =>{
-        //         return translate(tableRectWidth * i, 0)})
-        // }
-        // else{ 
-        //     let tableText = tableData.enter().append('text')
-        //                             .text(x => x)
-        //                             .attr('transform', (d, i) =>{
-        //                         return translate(tableRectWidth * i, 0)})
-        // }
+        d3.selectAll('.table-info')
+            .selectAll('text') 
+            .data(d => {
+                                return [
+                                    d.rank,
+                                    d.team,
+                                    d.W,
+                                    d.D,
+                                    d.L,
+                                    d.win_rate,
+                                    d.diff_game
+                                ];
+                            })
+            .text(x => x)
 
-        // let tableData = d3.selectAll('.table-info')
-        //                     .selectAll('g')
-        //                     .data(d => {
-        //                         return [
-        //                             d.rank,
-        //                             d.team,
-        //                             d.W,
-        //                             d.D,
-        //                             d.L,
-        //                             d.win_rate,
-        //                             d.diff_game
-        //                         ];
-        //                     })           
-                             
-        // d3.selectAll('.table-info').selectAll('text')
-        //   .data(currentData.rankings, d => {
-        //                         return [
-        //                             d.rank,
-        //                             d.team,
-        //                             d.W,
-        //                             d.D,
-        //                             d.L,
-        //                             d.win_rate,
-        //                             d.diff_game
-        //                         ];
-        //                     })  
-        //     .exit().remove();
-
-        // if(!init){
-        //     tableData.enter()
-        //             .append('text')
-        //             .text(x => x)
-        //             .attr('transform', (d, i) =>{
-        //         return translate(tableRectWidth * i, 0)})
-        // }
-        // else{ 
-        //     let tableText = tableData.enter().append('text')
-        //                             .text(x => x)
-        //                             .attr('transform', (d, i) =>{
-        //                         return translate(tableRectWidth * i, 0)})
-        // }
-
-        // // if (! init){
-        // //     d3.selectAll('.content-list')
-        // //         .selectAll('text')
-        // //         .data(currentData)
-        // //         .exit()
-        // //         .transition()
-        // //         .duration(500)
-        // //         .style('opacity', '0')
-        // //         .remove();
-        // // }     
+        // if (! init){
+        //     d3.selectAll('.table-info')
+        //         .selectAll('text')
+        //         .data(currentData)
+        //         .exit()
+        //         .transition()
+        //         .duration(500)
+        //         .style('opacity', '0')
+        //         .remove();
+        // }     
     }
 
     // Line Chart
@@ -305,6 +288,27 @@
                             .attr('stroke', d => colorTeam[d.team])
                             .attr('stroke-width', '1.5')
                             .attr('opacity', 0)
+                            .on('mouseenter', function(){
+                                let teamName = this.getAttribute('class').split(' ')[1]
+                                d3.selectAll('.' + teamName)
+                                    .style('stroke-width', '3')
+                                    .style('font-weight', 'bold')
+
+                                d3.select('#bar')
+                                    .selectAll('.' + teamName)
+                                    .style('stroke-width', '3')
+                                    .style('stroke', 'rgb(0,0,0)')
+                            })
+                            .on('mouseleave', function(){
+                                let teamName = this.getAttribute('class').split(' ')[1]
+                                d3.selectAll('.' + teamName)
+                                    .style('stroke-width', 1.5)
+                                    .style('font-weight', 'normal')
+                                    
+                                d3.select('#bar')
+                                    .selectAll('.' + teamName)
+                                    .style('stroke-width', '0')
+                            })
                             .transition()
                             .duration(500)
                             .attr('opacity', 1)
@@ -398,6 +402,27 @@
                             .attr('stroke', d => colorTeam[d.team])
                             .attr('stroke-width', '1.5')
                             .attr('opacity', 0)
+                            .on('mouseenter', function(){
+                                let teamName = this.getAttribute('class').split(' ')[1]
+                                d3.selectAll('.' + teamName)
+                                    .style('stroke-width', '3')
+                                    .style('font-weight', 'bold')
+
+                                d3.select('#bar')
+                                    .selectAll('.' + teamName)
+                                    .style('stroke-width', '3')
+                                    .style('stroke', 'rgb(0,0,0)')
+                            })
+                            .on('mouseleave', function(){
+                                let teamName = this.getAttribute('class').split(' ')[1]
+                                d3.selectAll('.' + teamName)
+                                    .style('stroke-width', 1.5)
+                                    .style('font-weight', 'normal')
+                                    
+                                d3.select('#bar')
+                                    .selectAll('.' + teamName)
+                                    .style('stroke-width', '0')
+                            })
                             .transition()
                             .duration(500)
                             .attr('opacity', 1)
@@ -483,10 +508,32 @@
                                     else{return height - barY(d.L);}})
                 .attr('class', d => 'bar-info ' + d.team)
                 .style('fill', d => colorTeam[d.team])
+                .on('mouseenter', function(){
+                    let teamName = this.getAttribute('class').split(' ')[1]
+                    d3.selectAll('.' + teamName)
+                        .style('stroke-width', '3')
+                        .style('font-weight', 'bold')
+
+                    d3.select('#bar')
+                        .selectAll('.' + teamName)
+                        .style('stroke-width', '3')
+                        .style('stroke', 'rgb(0,0,0)')
+                })
+                .on('mouseleave', function(){
+                    let teamName = this.getAttribute('class').split(' ')[1]
+                    d3.selectAll('.' + teamName)
+                        .style('stroke-width', 1.5)
+                        .style('font-weight', 'normal')
+                        
+                    d3.select('#bar')
+                        .selectAll('.' + teamName)
+                        .style('stroke-width', '0')
+                })
                 .transition()
                 .delay(500)
                 .duration(1000)
                 .style('opacity', 1.0)
+                
         }
         else{
             bar.enter()
