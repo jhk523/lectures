@@ -125,9 +125,7 @@
                 .attr('width', tableRectWidth)
                 .attr('height', tableRectHeight)
                 .attr('fill', 'none')
-                .attr('transform', (d, i) =>{
-                    return translate(tableRectWidth * i, height)
-                }) 
+                .attr('transform', (d, i) =>{return translate(tableRectWidth * i, height)}) 
 
             let tableTitleTexts = tableTitle.append('text')
                                 .text(x => x)
@@ -141,9 +139,8 @@
         }
 
         d3.selectAll('.table-info')
-                .data(currentData.rankings, d => d.team)
-                .exit()
-                .remove()
+            .data(currentData.rankings, d => d.team)
+            .exit().remove()
 
         let tableContents = d3.select('#table')
                                 .select('.content-group')
@@ -248,10 +245,23 @@
             .style('opacity', 1)
         }
 
+        let ranks = new Object;
+        for(let i=0; i<currentData.rankings.length; i++){
+            let rankValue = Object.values(ranks);
+
+            if (rankValue.includes(currentData.rankings[i].rank)){
+                ranks[currentData.rankings[i].team] = currentData.rankings[i].rank + 1;
+            }
+            else{
+                ranks[currentData.rankings[i].team] = currentData.rankings[i].rank;                
+            }
+        }
+        console.log(ranks)
         d3.selectAll('.table-info')
             .transition()
             .duration(500)
-            .attr('transform', (d, i) =>{return translate(0, tableRectHeight * (i+2))})
+            .attr('transform', (d, i, node) =>{
+            return translate(0, tableRectHeight * (ranks[d.team]+1))})
     }
 
     // Line Chart
@@ -261,6 +271,7 @@
         currentTeam = tempData[0]
         chartData = tempData[1]
 
+        //Win Rate
         if(win_diff == 'WR'){
             let chartWinRateX = d3.scaleLinear()
                         .domain([
@@ -372,6 +383,8 @@
                         .attr('class', 'chartAxis')
                         .attr('transform', translate(40, 0)) 
             }
+
+        // Diff Game
         else if (win_diff == 'DG'){
             let chartDiffGameX = d3.scaleLinear()
                         .domain([
