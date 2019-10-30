@@ -608,7 +608,27 @@
 
     d3.json('data.json').then(function(data){
         let uniqueTeam = [];
-        let colorTeam = new Object();
+        let colorTeam = {'OB': '#cc3333',
+                         'Samsung': '#074CA1',
+                         'MBC': '#fc032b',
+                         'Haitai': '#fc0fc0',
+                         'Lotte' : '#002856',
+                         'Sammi' : '#96c800',
+                         'Chungbo': '#33ccff',
+                         'Binggrae': '#0cf0cf',
+                         'Pacific': '#ff0000',
+                         'LG': '#c30452',
+                         'SBW': '#000000',
+                         'Hanhwa': '#ff6600',
+                         'Hyundai': '#333366',
+                         'Doosan' : '#131230',
+                         'KIA': '#f01e23',
+                         'SK': '#E1002A',
+                         'Woori': '#808285',
+                         'Heroes': '#820024',
+                         'Nexen': '#ffcc00',
+                         'NC': '#315288',
+                         'KT': '#003831'}
 
         data.forEach(function(d){
             d.rankings.forEach(function(d2){
@@ -624,9 +644,11 @@
         })
 
         uniqueTeam = [... new Set(uniqueTeam)];
-        for(let i=0; i<uniqueTeam.length; i++){
-            colorTeam[uniqueTeam[i]] = '#'+Math.floor(Math.random()*16777215).toString(16);
-        }
+        // for(let i=0; i<uniqueTeam.length; i++){
+        //     colorTeam[uniqueTeam[i]] = '#'+Math.floor(Math.random()*16777215).toString(16);
+        // }
+        console.log(uniqueTeam)
+        
 
         let year_selection = d3.select('.years')
                                 .selectAll('option')
